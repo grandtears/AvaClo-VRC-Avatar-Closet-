@@ -1,0 +1,237 @@
+import { Hono } from "hono";
+import { cors } from "hono/cors";
+import { getCookie, setCookie } from "hono/cookie";
+import { serve } from "@hono/node-server";
+
+import {
+    createSession,
+    hasSession,
+    vrcGetMyAvatars,
+    vrcLogin,
+    vrcVerify2FA,
+    vrcCountMyAvatars,
+    type TwoFAMethod
+} from "./vrc.ts";
+
+const app = new Hono();
+
+// CORS（Viteから叩く）
+app.use(
+    "*",
+    cors({
+        origin: "http://localhost:5173",
+        credentials: true
+    })
+);
+
+// 起動確認
+app.get("/health", (c) => c.json({ ok: true }));
+
+// sid cookie（サーバ側セッション）
+app.use("*", async (c, next) => {
+    let sid = getCookie(c, "sid");
+
+    if (!sid || !hasSession(sid)) {
+        sid = createSession();
+        setCookie(c, "sid", sid, {
+            httpOnly: true,
+            sameSite: "Lax",
+            path: "/"
+        });
+    }
+    await next();
+});
+
+/** ログイン **/
+app.post("/auth/login", async (c) => {
+    const { username, password } = await c.req.json<{ username: string; password: string }>();
+    const sid = getCookie(c, "sid")!;
+
+    const r = await vrcLogin(sid, username, password);
+
+    if (!r.ok) return c.json({ ok: false, status: r.status, body: r.body }, 401);
+
+    if (r.state === "2fa_required") {
+        return c.json({ ok: true, state: "2fa_required", methods: r.methods });
+    }
+
+    return c.json({
+        ok: true,
+        state: "logged_in",
+        displayName: (r.user as any)?.displayName ?? ""
+    });
+});
+
+/** 2FA **/
+app.post("/auth/2fa", async (c) => {
+    const { method, code } = await c.req.json<{ method: TwoFAMethod; code: string }>();
+    const sid = getCookie(c, "sid")!;
+
+    const r = await vrcVerify2FA(sid, method, code);
+
+    if (!r.ok) return c.json({ ok: false, status: r.status, body: r.body }, 401);
+
+    return c.json({
+        ok: true,
+        state: "logged_in",
+        displayName: (r.user as any)?.displayName ?? ""
+    });
+});
+
+/** アバターを返却するエンドポイント **/
+app.get("/avatars", async (c) => {
+    const sid = getCookie(c, "sid")!;
+
+    const n = Number(c.req.query("n") ?? "50");         // 1回に取る件数
+    const offset = Number(c.req.query("offset") ?? "0"); // 何件目から
+    const safeN = Number.isFinite(n) ? Math.min(Math.max(n, 1), 100) : 50;
+    const safeOffset = Number.isFinite(offset) ? Math.max(offset, 0) : 0;
+
+    try {
+        const r = await vrcGetMyAvatars(sid, safeN, safeOffset);
+
+        if (!r.ok) {
+            return c.json({ ok: false, status: r.status, body: r.body }, 401);
+        }
+
+        const avatars = (r.avatars ?? []).map((a: any) => ({
+            id: a.id,
+            name: a.name,
+            thumbnail: a.thumbnailImageUrl,
+            platform: a.platform,
+            updatedAt: a.updated_at,
+        }));
+
+        // VRChatは配列だけ返すので「次があるか」を推定
+        const hasMore = (r.avatars?.length ?? 0) === safeN;
+
+        return c.json({ ok: true, avatars, offset: safeOffset, n: safeN, hasMore });
+    } catch {
+        return c.json({ ok: false, error: "AVATARS_FAILED" }, 500);
+    }
+});
+
+let cachedTotal: number | null = null;
+
+/* トータルを返却するエンドポイント */
+app.get("/avatars", async (c) => {
+    const sid = getCookie(c, "sid")!;
+
+    const n = Number(c.req.query("n") ?? "50");
+    const offset = Number(c.req.query("offset") ?? "0");
+    const safeN = Number.isFinite(n) ? Math.min(Math.max(n, 1), 100) : 50;
+    const safeOffset = Number.isFinite(offset) ? Math.max(offset, 0) : 0;
+
+    try {
+        // 初回だけ総数を数える
+        if (cachedTotal === null) {
+            const cr = await vrcCountMyAvatars(sid);
+            if (!cr.ok) return c.json({ ok: false, status: cr.status, body: cr.body }, 401);
+            cachedTotal = cr.total;
+        }
+
+        const r = await vrcGetMyAvatars(sid, safeN, safeOffset);
+        if (!r.ok) return c.json({ ok: false, status: r.status, body: r.body }, 401);
+
+        const avatars = (r.avatars ?? []).map((a: any) => ({
+            id: a.id,
+            name: a.name,
+            thumbnail: a.thumbnailImageUrl,
+            platform: a.platform,
+            updatedAt: a.updated_at,
+        }));
+
+        return c.json({
+            ok: true,
+            avatars,
+            total: cachedTotal,
+            hasMore: safeOffset + avatars.length < cachedTotal,
+            offset: safeOffset,
+            n: safeN,
+        });
+    } catch {
+        return c.json({ ok: false, error: "AVATARS_FAILED" }, 500);
+    }
+});
+
+/**アバター検索のエンドポイント */
+app.get("/avatars/search", async (c) => {
+    const sid = getCookie(c, "sid")!;
+
+    const qRaw = (c.req.query("q") ?? "").trim();
+    const q = qRaw.toLowerCase();
+
+    const n = Number(c.req.query("n") ?? "50");          // 返す件数
+    const offset = Number(c.req.query("offset") ?? "0"); // 検索結果のオフセット
+    const safeN = Number.isFinite(n) ? Math.min(Math.max(n, 1), 100) : 50;
+    const safeOffset = Number.isFinite(offset) ? Math.max(offset, 0) : 0;
+
+    // 空検索は危険（全件になる）なので弾く
+    if (!q) {
+        return c.json({ ok: true, q: qRaw, totalMatches: 0, avatars: [], hasMore: false });
+    }
+
+    try {
+        // VRChat API 側のページを回しながら、名前一致だけ集める
+        const pageSize = 100; // VRChat側は最大100想定
+        let pageOffset = 0;
+
+        let matchedTotal = 0;
+        const window: any[] = []; // [safeOffset, safeOffset+safeN) の分だけ保持
+
+        while (true) {
+            const r = await vrcGetMyAvatars(sid, pageSize, pageOffset);
+            if (!r.ok) return c.json({ ok: false, status: r.status, body: r.body }, 401);
+
+            const items = r.avatars ?? [];
+            if (items.length === 0) break;
+
+            for (const a of items) {
+                const name = String((a as any).name ?? "");
+                if (name.toLowerCase().includes(q)) {
+                    // まず総一致数をカウント
+                    const idx = matchedTotal;
+                    matchedTotal += 1;
+
+                    // 返すウィンドウ範囲だけ保持
+                    if (idx >= safeOffset && idx < safeOffset + safeN) {
+                        window.push(a);
+                    }
+                }
+            }
+
+            // もう返す分が埋まってて、かつ「hasMore判定」に必要な最低限は満たしたら途中終了してもOK
+            // ただし totalMatches を正確に出したいので、今回は最後まで回す（正確版）
+            if (items.length < pageSize) break;
+
+            pageOffset += pageSize;
+        }
+
+        const avatars = window.map((a: any) => ({
+            id: a.id,
+            name: a.name,
+            thumbnail: a.thumbnailImageUrl,
+            platform: a.platform,
+            updatedAt: a.updated_at,
+        }));
+
+        const hasMore = safeOffset + avatars.length < matchedTotal;
+
+        return c.json({
+            ok: true,
+            q: qRaw,
+            totalMatches: matchedTotal,
+            avatars,
+            hasMore,
+            offset: safeOffset,
+            n: safeN,
+        });
+    } catch (e) {
+        return c.json({ ok: false, error: "SEARCH_FAILED" }, 500);
+    }
+});
+
+// 大事
+const port = 8787;
+serve({ fetch: app.fetch, port });
+console.log(`API started on http://localhost:${port}`);
