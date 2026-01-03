@@ -13,6 +13,49 @@ type Avatar = {
 
 const API = "http://localhost:8787";
 
+type BodyBase = {
+  id: string;
+  name: string;
+};
+
+/* 素体設定用 */
+const BODY_BASES_KEY = "vam.bodyBases.v1";
+
+function loadBodyBases(): BodyBase[] {
+  try {
+    const raw = localStorage.getItem(BODY_BASES_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveBodyBases(list: BodyBase[]) {
+  localStorage.setItem(BODY_BASES_KEY, JSON.stringify(list));
+}
+
+function uid() {
+  return crypto.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
+}
+
+// アバターID → 素体ID の対応表
+type AvatarBaseMap = Record<string, string>;
+
+const AVATAR_BASE_MAP_KEY = "vam.avatarBaseMap.v1";
+
+function loadAvatarBaseMap(): AvatarBaseMap {
+  try {
+    const raw = localStorage.getItem(AVATAR_BASE_MAP_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveAvatarBaseMap(map: AvatarBaseMap) {
+  localStorage.setItem(AVATAR_BASE_MAP_KEY, JSON.stringify(map));
+}
+
 export default function App() {
   const [state, setState] = useState<State>("idle");
 
@@ -44,6 +87,13 @@ export default function App() {
   const [searchHasMore, setSearchHasMore] = useState(false);
   const [searchTotal, setSearchTotal] = useState<number | null>(null);
   const [searchResults, setSearchResults] = useState<Avatar[]>([]);
+
+  const [showSettings, setShowSettings] = useState(false);
+  const [bodyBases, setBodyBases] = useState<BodyBase[]>(() => loadBodyBases());
+
+  const [avatarBaseMap, setAvatarBaseMap] = useState<AvatarBaseMap>(() =>
+    loadAvatarBaseMap()
+  );
 
   async function doLogin() {
     setError("");
@@ -182,6 +232,8 @@ export default function App() {
     }
   }
 
+
+
   useEffect(() => {
     if (state === "logged_in") {
       setOffset(0);
@@ -190,9 +242,22 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
+  /* 素体情報の永続化 */
+  useEffect(() => {
+    saveBodyBases(bodyBases);
+  }, [bodyBases]);
+
+  /* 素体IDの永続化 */
+  useEffect(() => {
+    saveAvatarBaseMap(avatarBaseMap);
+  }, [avatarBaseMap]);
+
   return (
     <div style={{ padding: 16, fontFamily: "system-ui" }}>
-      <h1>VRChat Avatar Manager</h1>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h1>VRChat Avatar Viewer</h1>
+        <button onClick={() => setShowSettings(true)}>⚙ 設定</button>
+      </div>
 
       {error && (
         <div style={{ padding: 12, marginBottom: 12, border: "1px solid #f99", background: "#fee" }}>
@@ -312,13 +377,49 @@ export default function App() {
                         style={{ width: "100%", borderRadius: 6 }}
                         loading="lazy"
                       />
+
                       <div style={{ marginTop: 6, fontWeight: 600 }}>{a.name}</div>
                       <small>{a.platform}</small>
+
+                      {/* 素体割り当て UI */}
+                      <div style={{ marginTop: 8 }}>
+                        <select
+                          value={avatarBaseMap[a.id] ?? ""}
+                          onChange={(e) => {
+                            const baseId = e.target.value;
+
+                            setAvatarBaseMap((prev) => {
+                              const next = { ...prev };
+                              if (baseId) {
+                                next[a.id] = baseId;
+                              } else {
+                                delete next[a.id];
+                              }
+                              return next;
+                            });
+                          }}
+                          style={{ width: "100%" }}
+                        >
+                          <option value="">（素体なし）</option>
+                          {bodyBases.map((b) => (
+                            <option key={b.id} value={b.id}>
+                              {b.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* 現在の割り当て表示（任意だけどおすすめ） */}
+                      {avatarBaseMap[a.id] && (
+                        <div style={{ marginTop: 4, fontSize: 12, opacity: 0.8 }}>
+                          素体:{" "}
+                          {bodyBases.find((b) => b.id === avatarBaseMap[a.id])?.name ?? "（不明）"}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
 
-                {/* もっと読む（grid外に出す） */}
                 {shownHasMore && (
                   <div style={{ marginTop: 16 }}>
                     <button onClick={() => (mode === "search" ? searchAvatars(false) : loadAvatars(false))}>
@@ -331,6 +432,101 @@ export default function App() {
           })()}
         </div>
       )}
+      {/* 設定モーダル */}
+      {showSettings && (<SettingsModal bodyBases={bodyBases} setBodyBases={setBodyBases} onClose={() => setShowSettings(false)} />)}
     </div>
   );
+
+  /**
+   * 設定モーダル
+   */
+  function SettingsModal(props: {
+    bodyBases: BodyBase[];
+    setBodyBases: React.Dispatch<React.SetStateAction<BodyBase[]>>;
+    onClose: () => void;
+  }) {
+    const { bodyBases, setBodyBases, onClose } = props;
+
+    const [input, setInput] = useState("");
+
+    function add() {
+      const name = input.trim();
+      if (!name) return;
+
+      setBodyBases(prev => [
+        ...prev,
+        { id: uid(), name }
+      ]);
+      setInput("");
+    }
+
+    function remove(id: string) {
+      setBodyBases(prev => prev.filter(b => b.id !== id));
+    }
+
+    return (
+      <div style={overlayStyle}>
+        <div style={modalStyle}>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <h2>素体設定</h2>
+            <button onClick={onClose}>✕</button>
+          </div>
+
+          {/* 追加 */}
+          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+            <input
+              placeholder="素体名を入力（例：マヌカ）"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && add()}
+              style={{ flex: 1 }}
+            />
+            <button onClick={add}>＋</button>
+          </div>
+
+          {/* 一覧 */}
+          <div style={{ display: "grid", gap: 6 }}>
+            {bodyBases.map(b => (
+              <div
+                key={b.id}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  border: "1px solid #ddd",
+                  padding: 8,
+                  borderRadius: 6
+                }}
+              >
+                <span>{b.name}</span>
+                <button onClick={() => remove(b.id)}>×</button>
+              </div>
+            ))}
+            {bodyBases.length === 0 && (
+              <div style={{ opacity: 0.6 }}>まだ素体がありません</div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 }
+
+/* モーダルウィンドウのCSS */
+const overlayStyle: React.CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  background: "rgba(0,0,0,0.4)",
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  zIndex: 1000,
+};
+
+const modalStyle: React.CSSProperties = {
+  background: "#fff",
+  borderRadius: 8,
+  padding: 16,
+  width: 420,
+  maxHeight: "80vh",
+  overflowY: "auto",
+};
