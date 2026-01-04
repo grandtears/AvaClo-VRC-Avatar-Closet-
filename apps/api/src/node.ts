@@ -109,13 +109,21 @@ app.get("/avatars", async (c) => {
             return c.json({ ok: false, status: r.status, body: r.body }, 401);
         }
 
-        const avatars = (r.avatars ?? []).map((a: any) => ({
-            id: a.id,
-            name: a.name,
-            thumbnail: a.thumbnailImageUrl,
-            platform: a.platform,
-            updatedAt: a.updated_at,
-        }));
+        const avatars = (r.avatars ?? []).map((a: any) => {
+            const platforms = Array.from(
+                new Set((a.unityPackages ?? []).map((p: any) => String(p.platform)).filter(Boolean))
+            );
+
+            return {
+                id: a.id,
+                name: a.name,
+                thumbnail: a.thumbnailImageUrl,
+                createdAt: a.created_at,
+                updatedAt: a.updated_at,
+                platforms,
+                performance: a.performance ?? null,
+            };
+        });
 
         // VRChatは配列だけ返すので「次があるか」を推定
         const hasMore = (r.avatars?.length ?? 0) === safeN;
@@ -220,13 +228,21 @@ app.get("/avatars/search", async (c) => {
             pageOffset += pageSize;
         }
 
-        const avatars = window.map((a: any) => ({
-            id: a.id,
-            name: a.name,
-            thumbnail: a.thumbnailImageUrl,
-            platform: a.platform,
-            updatedAt: a.updated_at,
-        }));
+        const avatars = window.map((a: any) => {
+            const platforms = Array.from(
+                new Set((a.unityPackages ?? []).map((p: any) => String(p.platform)).filter(Boolean))
+            );
+
+            return {
+                id: a.id,
+                name: a.name,
+                thumbnail: a.thumbnailImageUrl,
+                createdAt: a.created_at,
+                updatedAt: a.updated_at,
+                platforms,
+                performance: a.performance ?? null,
+            };
+        });
 
         const hasMore = safeOffset + avatars.length < matchedTotal;
 

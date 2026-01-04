@@ -7,8 +7,10 @@ type Avatar = {
   id: string;
   name: string;
   thumbnail: string;
-  platform?: string;
+  platforms?: string[];
   updatedAt?: string;
+  createdAt?: string;
+  performance?: string;
 };
 
 const API = "http://localhost:8787";
@@ -94,6 +96,8 @@ export default function App() {
     loadAvatarBaseMap()
   );
 
+  const [onlyMobile, setOnlyMobile] = useState(false);
+
   // 素体フィルタ（"" = すべて, "__none__" = 未割り当て）
   const [filterBaseId, setFilterBaseId] = useState<string>("");
 
@@ -101,14 +105,57 @@ export default function App() {
   const shownHasMore = mode === "search" ? searchHasMore : hasMore;
 
   const filteredAvatars = useMemo(() => {
-    if (!filterBaseId) return shownAvatars;
+    let list = shownAvatars;
 
-    if (filterBaseId === "__none__") {
-      return shownAvatars.filter((a) => !avatarBaseMap[a.id]);
+    // ① 素体フィルタ
+    if (filterBaseId) {
+      if (filterBaseId === "__none__") {
+        list = list.filter((a) => !avatarBaseMap[a.id]);
+      } else {
+        list = list.filter((a) => avatarBaseMap[a.id] === filterBaseId);
+      }
     }
 
-    return shownAvatars.filter((a) => avatarBaseMap[a.id] === filterBaseId);
-  }, [shownAvatars, filterBaseId, avatarBaseMap]);
+    // ② モバイル対応（Android / iOS = android）
+    if (onlyMobile) {
+      list = list.filter((a) =>
+        (a.platforms ?? []).includes("android")
+      );
+    }
+
+    // ③ 検索（アバター名 or 素体名）
+    const q = query.trim();
+    if (!q) return list;
+
+    const qNorm = q.normalize("NFKC").toLowerCase();
+
+    return list.filter((a) => {
+      const avatarName = (a.name ?? "")
+        .normalize("NFKC")
+        .toLowerCase();
+
+      const baseId = avatarBaseMap[a.id];
+      const baseName = baseId
+        ? bodyBases.find((b) => b.id === baseId)?.name ?? ""
+        : "";
+
+      const baseNameNorm = baseName
+        .normalize("NFKC")
+        .toLowerCase();
+
+      return (
+        avatarName.includes(qNorm) ||
+        baseNameNorm.includes(qNorm)
+      );
+    });
+  }, [
+    shownAvatars,
+    filterBaseId,
+    avatarBaseMap,
+    onlyMobile,
+    query,
+    bodyBases,
+  ]);
 
   async function doLogin() {
     setError("");
@@ -265,6 +312,58 @@ export default function App() {
     } catch {
       setError("アバター変更APIに接続できません");
     }
+  }
+
+
+  function normalizeRank(x: unknown): string | null {
+    if (!x) return null;
+    const s = String(x).trim();
+    if (!s) return null;
+    // 表記揺れ吸収
+    const u = s.toLowerCase();
+    if (u.includes("excellent")) return "Excellent";
+    if (u.includes("good")) return "Good";
+    if (u.includes("medium")) return "Medium";
+    if (u.includes("poor") && !u.includes("very")) return "Poor";
+    if (u.includes("verypoor") || u.includes("very poor")) return "VeryPoor";
+    return s;
+  }
+
+  function getPerfRank(perf: any, platform: "standalonewindows" | "android"): string | null {
+    if (!perf) return null;
+
+    // ケース1: perf が文字列（まれ）
+    const asStr = normalizeRank(perf);
+    if (typeof perf === "string" && asStr) return asStr;
+
+    // ケース2: { "standalonewindows": { rating/rank: "Excellent" }, "android": {...} } みたいな形
+    const p1 = perf?.[platform];
+    const r1 = normalizeRank(p1?.rating ?? p1?.rank ?? p1);
+    if (r1) return r1;
+
+    // ケース3: { pc: {...}, quest: {...} } みたいな別名
+    const altKey =
+      platform === "standalonewindows" ? (perf?.pc ?? perf?.windows ?? perf?.win) : (perf?.quest ?? perf?.mobile ?? perf?.android);
+    const r2 = normalizeRank(altKey?.rating ?? altKey?.rank ?? altKey);
+    if (r2) return r2;
+
+    // ケース4: どこかに rating/rank が直でいる
+    const r3 = normalizeRank(perf?.rating ?? perf?.rank);
+    if (r3) return r3;
+
+    return null;
+  }
+
+  function rankBadge(rank: string | null): string {
+    console.log(rank);
+    if (!rank) return "-";
+    // 好みで絵文字
+    if (rank === "Excellent") return "🟦 Excellent";
+    if (rank === "Good") return "🟩 Good";
+    if (rank === "Medium") return "🟨 Medium";
+    if (rank === "Poor") return "🟧 Poor";
+    if (rank === "VeryPoor") return "🟥 VeryPoor";
+    return rank;
   }
   useEffect(() => {
     (async () => {
@@ -478,6 +577,16 @@ export default function App() {
             {filterBaseId && (
               <button onClick={() => setFilterBaseId("")}>解除</button>
             )}
+
+            {/* モバイル対応フィルタ */}
+            <label style={{ display: "flex", gap: 4, alignItems: "center" }}>
+              <input
+                type="checkbox"
+                checked={onlyMobile}
+                onChange={(e) => setOnlyMobile(e.target.checked)}
+              />
+              Quest / Mobile 対応のみ
+            </label>
           </div>
 
           {/* 一覧（IIFEを廃止して通常描画に） */}
@@ -497,7 +606,21 @@ export default function App() {
                 />
 
                 <div style={{ marginTop: 6, fontWeight: 600 }}>{a.name}</div>
-                <small>{a.platform}</small>
+                <div style={{ marginTop: 6, fontSize: 12, opacity: 0.85 }}>
+                  <div>
+                    対応: <b>{(a.platforms ?? []).join(", ") || "-"}</b>
+                  </div>
+                  <div>
+                    作成: {a.createdAt ? new Date(a.createdAt).toLocaleString() : "-"}
+                  </div>
+                  <div>
+                    更新: {a.updatedAt ? new Date(a.updatedAt).toLocaleString() : "-"}
+                  </div>
+                </div>
+                <div style={{ marginTop: 6, fontSize: 12, opacity: 0.9 }}>
+                  <div>🖥 {rankBadge(getPerfRank(a.performance, "standalonewindows"))}</div>
+                  <div>📱 {rankBadge(getPerfRank(a.performance, "android"))}</div>
+                </div>
 
                 <button
                   onClick={() =>
