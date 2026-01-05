@@ -1,129 +1,35 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import "./App.css";
 import "./index.css";
-
-type State = "boot" | "idle" | "2fa_required" | "logged_in";
-type TwoFAMethod = "totp" | "emailOtp";
-
-type Avatar = {
-  id: string;
-  name: string;
-  thumbnail: string;
-  platforms?: string[];
-  updatedAt?: string;
-  createdAt?: string;
-  performance?: string;
-};
+import type {
+  Avatar,
+  AvatarBaseMap,
+  AvatarFavMap,
+  AvatarTagMap,
+  BodyBase,
+  FavFolder,
+  State,
+  TwoFAMethod,
+} from "./types";
+import {
+  loadBodyBases,
+  saveBodyBases,
+  loadAvatarBaseMap,
+  saveAvatarBaseMap,
+  loadFavFolders,
+  saveFavFolders,
+  loadAvatarFavMap,
+  saveAvatarFavMap,
+  loadAvatarTags,
+  saveAvatarTags,
+  loadConfirmAvatarChange,
+  saveConfirmAvatarChange,
+} from "./storage";
+import { uid, normalizeRank, getPerfRank, rankBadge } from "./utils";
+import { SettingsModal } from "./components/SettingsModal";
+import { BaseItem } from "./components/BaseItem";
 
 const API = "http://localhost:8787";
-
-type BodyBase = {
-  id: string;
-  name: string;
-};
-
-/* 素体設定用 */
-const BODY_BASES_KEY = "vam.bodyBases.v1";
-
-function loadBodyBases(): BodyBase[] {
-  try {
-    const raw = localStorage.getItem(BODY_BASES_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveBodyBases(list: BodyBase[]) {
-  localStorage.setItem(BODY_BASES_KEY, JSON.stringify(list));
-}
-
-function uid() {
-  return crypto.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
-}
-
-// アバターID → 素体ID の対応表
-type AvatarBaseMap = Record<string, string>;
-
-const AVATAR_BASE_MAP_KEY = "vam.avatarBaseMap.v1";
-
-function loadAvatarBaseMap(): AvatarBaseMap {
-  try {
-    const raw = localStorage.getItem(AVATAR_BASE_MAP_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
-}
-
-function saveAvatarBaseMap(map: AvatarBaseMap) {
-  localStorage.setItem(AVATAR_BASE_MAP_KEY, JSON.stringify(map));
-}
-
-const CONFIRM_AVATAR_CHANGE_KEY = "vam.confirmAvatarChange.v1";
-
-/* お気に入りフォルダ用 */
-type FavFolder = {
-  id: string;
-  name: string;
-};
-type AvatarFavMap = Record<string, string>;
-
-const FAV_FOLDERS_KEY = "vam.favFolders.v1";
-const AVATAR_FAV_MAP_KEY = "vam.avatarFavMap.v1";
-
-function loadFavFolders(): FavFolder[] {
-  try {
-    const raw = localStorage.getItem(FAV_FOLDERS_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-function saveFavFolders(list: FavFolder[]) {
-  localStorage.setItem(FAV_FOLDERS_KEY, JSON.stringify(list));
-}
-
-function loadAvatarFavMap(): AvatarFavMap {
-  try {
-    const raw = localStorage.getItem(AVATAR_FAV_MAP_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
-}
-function saveAvatarFavMap(map: AvatarFavMap) {
-  localStorage.setItem(AVATAR_FAV_MAP_KEY, JSON.stringify(map));
-}
-
-/* タグ機能用 */
-type AvatarTagMap = Record<string, string[]>;
-const AVATAR_TAG_MAP_KEY = "vam.avatarTagMap.v1";
-
-function loadAvatarTags(): AvatarTagMap {
-  try {
-    const raw = localStorage.getItem(AVATAR_TAG_MAP_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
-}
-function saveAvatarTags(map: AvatarTagMap) {
-  localStorage.setItem(AVATAR_TAG_MAP_KEY, JSON.stringify(map));
-}
-
-function loadConfirmAvatarChange(): boolean {
-  try {
-    const raw = localStorage.getItem(CONFIRM_AVATAR_CHANGE_KEY);
-    return raw === "true"; // default false if null
-  } catch {
-    return false;
-  }
-}
-
-function saveConfirmAvatarChange(enabled: boolean) {
-  localStorage.setItem(CONFIRM_AVATAR_CHANGE_KEY, String(enabled));
-}
 
 export default function App() {
   const [state, setState] = useState<State>("boot");
@@ -510,64 +416,7 @@ export default function App() {
   }
 
 
-  function normalizeRank(x: unknown): string | null {
-    if (!x) return null;
-    const s = String(x).trim();
-    if (!s) return null;
-    // 表記揺れ吸収
-    const u = s.toLowerCase();
-    if (u.includes("excellent")) return "Excellent";
-    if (u.includes("good")) return "Good";
-    if (u.includes("medium")) return "Medium";
-    if (u.includes("poor") && !u.includes("very")) return "Poor";
-    if (u.includes("verypoor") || u.includes("very poor")) return "VeryPoor";
-    return s;
-  }
 
-  function getPerfRank(perf: any, platform: "standalonewindows" | "android"): string | null {
-    if (!perf) return null;
-
-    const asStr = normalizeRank(perf);
-    if (typeof perf === "string" && asStr) return asStr;
-
-    const p1 = perf?.[platform];
-    const r1 = normalizeRank(p1?.rating ?? p1?.rank ?? p1);
-    if (r1) return r1;
-
-    const altKey =
-      platform === "standalonewindows"
-        ? perf?.pc ?? perf?.windows ?? perf?.win
-        : perf?.quest ?? perf?.mobile ?? perf?.android;
-    const r2 = normalizeRank(altKey?.rating ?? altKey?.rank ?? altKey);
-    if (r2) return r2;
-
-    const r3 = normalizeRank(perf?.rating ?? perf?.rank);
-    if (r3) return r3;
-
-    return null;
-  }
-
-  function rankBadge(rank: string | null): string {
-    if (!rank) return "-";
-    if (rank === "Excellent") return "🟦 Excellent";
-    if (rank === "Good") return "🟩 Good";
-    if (rank === "Medium") return "🟨 Medium";
-    if (rank === "Poor") return "🟧 Poor";
-    if (rank === "VeryPoor") return "🟥 VeryPoor";
-    return rank;
-  }
-
-  function BaseItem(props: { active: boolean; label: string; onClick: () => void }) {
-    const { active, label, onClick } = props;
-    return (
-      <button
-        onClick={onClick}
-        className={`sidebar-item ${active ? "active" : ""}`}
-      >
-        {label}
-      </button>
-    );
-  }
 
   useEffect(() => {
     (async () => {
@@ -1185,149 +1034,4 @@ export default function App() {
   );
 }
 
-/**
- * 設定モーダル
- */
-function SettingsModal(props: {
-  bodyBases: BodyBase[];
-  setBodyBases: React.Dispatch<React.SetStateAction<BodyBase[]>>;
-  setAvatarBaseMap: React.Dispatch<React.SetStateAction<AvatarBaseMap>>;
-  confirmAvatarChange: boolean;
-  setConfirmAvatarChange: React.Dispatch<React.SetStateAction<boolean>>;
-  onClose: () => void;
-  onExport: () => void;
-  onImport: (file: File) => void;
-}) {
-  const {
-    bodyBases,
-    setBodyBases,
-    setAvatarBaseMap,
-    confirmAvatarChange,
-    setConfirmAvatarChange,
-    onClose,
-    onExport,
-    onImport,
-  } = props;
 
-  const [input, setInput] = useState("");
-
-  function add() {
-    const name = input.trim();
-    if (!name) return;
-
-    setBodyBases((prev) => [...prev, { id: uid(), name }]);
-    setInput("");
-  }
-
-  function remove(id: string) {
-    setBodyBases((prev) => prev.filter((b) => b.id !== id));
-
-    setAvatarBaseMap((prev) => {
-      const next: AvatarBaseMap = { ...prev };
-      for (const aid of Object.keys(next)) {
-        if (next[aid] === id) delete next[aid];
-      }
-      return next;
-    });
-  }
-
-  return (
-    <div style={overlayStyle}>
-      <div style={modalStyle}>
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <h2>素体設定</h2>
-          <button onClick={onClose}>✕</button>
-        </div>
-
-        {/* 全般設定 */}
-        <div style={{ marginBottom: 16 }}>
-          <h3 style={{ fontSize: 16, margin: "0 0 8px 0" }}>全般</h3>
-          <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-            <input
-              type="checkbox"
-              checked={confirmAvatarChange}
-              onChange={(e) => setConfirmAvatarChange(e.target.checked)}
-            />
-            アバター変更時に確認ダイアログを表示する
-          </label>
-        </div>
-
-        {/* データ管理 */}
-        <div style={{ marginBottom: 16 }}>
-          <h3 style={{ fontSize: 16, margin: "0 0 8px 0" }}>データ管理</h3>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button className="btn btn-secondary btn-sm" onClick={onExport}>
-              📥 エクスポート (JSON)
-            </button>
-            <label className="btn btn-secondary btn-sm" style={{ cursor: "pointer" }}>
-              📤 インポート (JSON)
-              <input
-                type="file"
-                accept=".json"
-                style={{ display: "none" }}
-                onChange={(e) => {
-                  if (e.target.files?.[0]) onImport(e.target.files[0]);
-                  e.target.value = "";
-                }}
-              />
-            </label>
-          </div>
-        </div>
-
-        {/* 追加 */}
-        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-          <input
-            placeholder="素体名を入力（例：マヌカ）"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && add()}
-            style={{ flex: 1 }}
-          />
-          <button onClick={add}>＋</button>
-        </div>
-
-        {/* 一覧 */}
-        <div style={{ display: "grid", gap: 6 }}>
-          {bodyBases.map((b) => (
-            <div
-              key={b.id}
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                border: "1px solid #ddd",
-                padding: 8,
-                borderRadius: 6,
-              }}
-            >
-              <span>{b.name}</span>
-              <button onClick={() => remove(b.id)}>×</button>
-            </div>
-          ))}
-          {bodyBases.length === 0 && (
-            <div style={{ opacity: 0.6 }}>まだ素体がありません</div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* モーダルウィンドウのCSS */
-const overlayStyle: React.CSSProperties = {
-  position: "fixed",
-  inset: 0,
-  background: "rgba(0,0,0,0.4)",
-  display: "flex",
-  justifyContent: "center",
-  alignItems: "center",
-  zIndex: 1000,
-};
-
-const modalStyle: React.CSSProperties = {
-  background: "#fff",
-  borderRadius: 8,
-  padding: 16,
-  width: 420,
-  maxHeight: "80vh",
-  overflowY: "auto",
-};
