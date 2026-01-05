@@ -80,3 +80,136 @@
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
+
+/* タグ表示 */
+.tag-chip {
+  background: #f0f0f0;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid #ddd;
+}
+
+.tag-delete-btn {
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0;
+  font-size: 10px;
+  color: #888;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+}
+
+.tag-delete-btn:hover {
+  color: #f00;
+  background: #ffcccc;
+  border-radius: 50%;
+}
+
+.tag-form {
+  display: flex;
+  gap: 4px;
+}
+
+.tag-input {
+  flex: 1;
+  padding: 4px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  font-size: 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ログイン画面  */
+.login-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.login-card {
+  background: #ffffff;
+  padding: 40px;
+  border-radius: 16px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 400px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.login-title {
+  font-size: 24px;
+  font-weight: bold;
+  color: #1565c0;
+  margin-bottom: 8px;
+}
+
+.login-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 16px;
+  transition: all 0.2s;
+  box-sizing: border-box;
+  background: #f8f9fa;
+}
+
+.login-input:focus {
+  border-color: #2196f3;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+  outline: none;
+}
+
+.login-button {
+  width: 100%;
+  padding: 12px;
+  background: linear-gradient(to right, #2196f3, #1976d2);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.2s;
+}
+
+.login-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
+}
+
+.login-button:active {
+  transform: translateY(0);
+}
+
+.security-note {
+  font-size: 12px;
+  color: #78909c;
+  margin-top: 16px;
+  line-height: 1.5;
+  background: #f1f8e9;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #c5e1a5;
+  text-align: left;
+}

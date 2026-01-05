@@ -96,6 +96,22 @@ function saveAvatarFavMap(map: AvatarFavMap) {
   localStorage.setItem(AVATAR_FAV_MAP_KEY, JSON.stringify(map));
 }
 
+/* タグ機能用 */
+type AvatarTagMap = Record<string, string[]>;
+const AVATAR_TAG_MAP_KEY = "vam.avatarTagMap.v1";
+
+function loadAvatarTags(): AvatarTagMap {
+  try {
+    const raw = localStorage.getItem(AVATAR_TAG_MAP_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+function saveAvatarTags(map: AvatarTagMap) {
+  localStorage.setItem(AVATAR_TAG_MAP_KEY, JSON.stringify(map));
+}
+
 function loadConfirmAvatarChange(): boolean {
   try {
     const raw = localStorage.getItem(CONFIRM_AVATAR_CHANGE_KEY);
@@ -167,6 +183,9 @@ export default function App() {
   // お気に入りフィルタ（"" = すべて, "__none__" = 未分類）
   const [filterFavId, setFilterFavId] = useState<string>("");
 
+  /* タグ機能 state */
+  const [avatarTags, setAvatarTags] = useState<AvatarTagMap>(() => loadAvatarTags());
+
   /* サイドバー開閉 */
   const [isBodyExpanded, setIsBodyExpanded] = useState(false);
   const [isFavExpanded, setIsFavExpanded] = useState(false);
@@ -223,10 +242,17 @@ export default function App() {
         : "";
       const favNameNorm = favName.normalize("NFKC").toLowerCase();
 
+      // タグ検索
+      const tags = avatarTags[a.id] || [];
+      const tagsHit = tags.some((t) =>
+        t.normalize("NFKC").toLowerCase().includes(qNorm)
+      );
+
       return (
         avatarName.includes(qNorm) ||
         baseNameNorm.includes(qNorm) ||
-        favNameNorm.includes(qNorm)
+        favNameNorm.includes(qNorm) ||
+        tagsHit
       );
     });
   }, [
@@ -239,6 +265,7 @@ export default function App() {
     filterFavId,
     favFolders,
     avatarFavMap,
+    avatarTags,
   ]);
   const baseCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -576,6 +603,11 @@ export default function App() {
     saveAvatarFavMap(avatarFavMap);
   }, [avatarFavMap]);
 
+  /* タグ永続化 */
+  useEffect(() => {
+    saveAvatarTags(avatarTags);
+  }, [avatarTags]);
+
   useEffect(() => {
     const base = bodyBases.find((b) => b.id === filterBaseId);
     console.log("filterBaseId:", filterBaseId, "name:", base?.name);
@@ -595,7 +627,7 @@ export default function App() {
           gap: 8,
         }}
       >
-        <h1>VRChat Avatar Viewer</h1>
+        <h1>VRC Avatar Manager</h1>
         <div style={{ display: "flex", gap: 8 }}>
           {state === "logged_in" && (
             <button
@@ -632,20 +664,34 @@ export default function App() {
       {state === "boot" && <div style={{ opacity: 0.7 }}>起動中…</div>}
 
       {state === "idle" && (
-        <div style={{ maxWidth: 420, display: "grid", gap: 8 }}>
-          <h2>ログイン</h2>
-          <input
-            placeholder="VRChat Username（メールは基本NG）"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-          />
-          <input
-            placeholder="Password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-          <button onClick={doLogin}>ログイン</button>
+        <div className="login-container">
+          <div className="login-card">
+            <h1 style={{ margin: "0 0 10px", color: "#555", fontSize: "1.2rem" }}>VRC Avatar Manager</h1>
+            <div className="login-title">ログイン</div>
+            <input
+              className="login-input"
+              placeholder="VRChat Username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+            />
+            <input
+              className="login-input"
+              placeholder="Password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") doLogin();
+              }}
+            />
+            <button className="login-button" onClick={doLogin}>
+              ログイン
+            </button>
+
+            <div className="security-note">
+              🔒 認証情報はVRChatのAPI認証にのみ使用され、外部サーバーには送信されません。
+            </div>
+          </div>
         </div>
       )}
 
@@ -1043,6 +1089,7 @@ export default function App() {
                           });
                         }}
                         style={{ width: "100%" }}
+                        className="modern-select"
                       >
                         <option value="">（お気に入りなし）</option>
                         {favFolders.map((f) => (
@@ -1051,6 +1098,61 @@ export default function App() {
                           </option>
                         ))}
                       </select>
+                    </div>
+
+                    {/* タグ (最大5個) */}
+                    <div style={{ marginTop: 8 }}>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 4 }}>
+                        {(avatarTags[a.id] || []).map((tag, i) => (
+                          <span key={i} className="tag-chip">
+                            {tag}
+                            <button
+                              className="tag-delete-btn"
+                              onClick={() => {
+                                setAvatarTags((prev) => {
+                                  const next = { ...prev };
+                                  const list = next[a.id] || [];
+                                  next[a.id] = list.filter((_, idx) => idx !== i);
+                                  if (next[a.id].length === 0) delete next[a.id];
+                                  return next;
+                                });
+                              }}
+                            >
+                              ✕
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+
+                      {(avatarTags[a.id] || []).length < 5 && (
+                        <form
+                          className="tag-form"
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            const input = e.currentTarget.elements.namedItem("tag") as HTMLInputElement;
+                            const val = input.value.trim();
+                            if (!val) return;
+                            if ((avatarTags[a.id] || []).length >= 5) return;
+
+                            setAvatarTags((prev) => {
+                              const next = { ...prev };
+                              const list = next[a.id] || [];
+                              next[a.id] = [...list, val];
+                              return next;
+                            });
+                            input.value = "";
+                          }}
+                        >
+                          <input
+                            name="tag"
+                            className="tag-input"
+                            placeholder="タグを追加"
+                          />
+                          <button type="submit" style={{ fontSize: 12, padding: "2px 6px" }}>
+                            ＋
+                          </button>
+                        </form>
+                      )}
                     </div>
                   </div>
                 ))}
