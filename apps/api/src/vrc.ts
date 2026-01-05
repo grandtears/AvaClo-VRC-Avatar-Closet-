@@ -74,6 +74,12 @@ function getSession(sid: string) {
     return s;
 }
 
+export function deleteSession(sid: string) {
+    if (sessions.delete(sid)) {
+        saveSessions();
+    }
+}
+
 async function readJsonSafe(res: Response) {
     const text = await res.text();
     try {
@@ -174,14 +180,16 @@ export async function vrcGetMe(sid: string) {
 }
 
 /** 自分のアバター一覧 */
-export async function vrcGetMyAvatars(sid: string, n = 50, offset = 0) {
+export async function vrcGetMyAvatars(sid: string, n = 50, offset = 0, sort = "updated", order = "descending") {
     const { jar } = getSession(sid);
     const f = getAuthedFetch(jar);
 
     const url =
         `${VRC_BASE}/avatars?ownerId=me&releaseStatus=all` +
         `&n=${encodeURIComponent(String(n))}` +
-        `&offset=${encodeURIComponent(String(offset))}`;
+        `&offset=${encodeURIComponent(String(offset))}` +
+        `&sort=${encodeURIComponent(sort)}` +
+        `&order=${encodeURIComponent(order)}`;
 
     const res = await f(url, {
         method: "GET",

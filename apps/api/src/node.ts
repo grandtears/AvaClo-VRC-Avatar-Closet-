@@ -12,6 +12,7 @@ import {
     vrcCountMyAvatars,
     vrcGetMe,
     vrcSelectAvatar,
+    deleteSession,
     type TwoFAMethod
 } from "./vrc.ts";
 
@@ -93,26 +94,55 @@ app.post("/auth/2fa", async (c) => {
     });
 });
 
+/** ログアウト（sid のセッション破棄 + cookie削除） */
+app.post("/auth/logout", async (c) => {
+    const sid = c.get("sid");
+
+    // サーバ側の jar を破棄（= VRChatログイン情報も消える）
+    deleteSession(sid);
+
+    // ブラウザの sid cookie も消す（次のアクセスで新sidが発行される）
+    setCookie(c, "sid", "", {
+        httpOnly: true,
+        sameSite: "Lax",
+        path: "/",
+        maxAge: 0,
+    });
+
+    return c.json({ ok: true });
+});
+
 /** アバターを返却するエンドポイント **/
 app.get("/avatars", async (c) => {
     const sid = c.get("sid");
 
-    const n = Number(c.req.query("n") ?? "50");         // 1回に取る件数
+    const n = Number(c.req.query("n") ?? "100");         // 1回に取る件数
     const offset = Number(c.req.query("offset") ?? "0"); // 何件目から
-    const safeN = Number.isFinite(n) ? Math.min(Math.max(n, 1), 100) : 50;
+    const sort = c.req.query("sort") ?? "updated";
+    const order = c.req.query("order") ?? "descending";
+
+    const safeN = Number.isFinite(n) ? Math.min(Math.max(n, 1), 100) : 100;
     const safeOffset = Number.isFinite(offset) ? Math.max(offset, 0) : 0;
 
     try {
-        const r = await vrcGetMyAvatars(sid, safeN, safeOffset);
+        const r = await vrcGetMyAvatars(sid, safeN, safeOffset, sort, order);
 
         if (!r.ok) {
             return c.json({ ok: false, status: r.status, body: r.body }, 401);
         }
 
         const avatars = (r.avatars ?? []).map((a: any) => {
-            const platforms = Array.from(
-                new Set((a.unityPackages ?? []).map((p: any) => String(p.platform)).filter(Boolean))
-            );
+            const platforms: string[] = [];
+            const performanceMap: Record<string, string> = {};
+
+            for (const p of (a.unityPackages ?? [])) {
+                if (p.platform) {
+                    platforms.push(p.platform);
+                    if (p.performanceRating) {
+                        performanceMap[p.platform] = p.performanceRating;
+                    }
+                }
+            }
 
             return {
                 id: a.id,
@@ -120,8 +150,8 @@ app.get("/avatars", async (c) => {
                 thumbnail: a.thumbnailImageUrl,
                 createdAt: a.created_at,
                 updatedAt: a.updated_at,
-                platforms,
-                performance: a.performance ?? null,
+                platforms: Array.from(new Set(platforms)),
+                performance: Object.keys(performanceMap).length > 0 ? performanceMap : (a.performance ?? null),
             };
         });
 

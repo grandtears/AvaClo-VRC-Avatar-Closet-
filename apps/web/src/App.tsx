@@ -58,6 +58,21 @@ function saveAvatarBaseMap(map: AvatarBaseMap) {
   localStorage.setItem(AVATAR_BASE_MAP_KEY, JSON.stringify(map));
 }
 
+const CONFIRM_AVATAR_CHANGE_KEY = "vam.confirmAvatarChange.v1";
+
+function loadConfirmAvatarChange(): boolean {
+  try {
+    const raw = localStorage.getItem(CONFIRM_AVATAR_CHANGE_KEY);
+    return raw === "true"; // default false if null
+  } catch {
+    return false;
+  }
+}
+
+function saveConfirmAvatarChange(enabled: boolean) {
+  localStorage.setItem(CONFIRM_AVATAR_CHANGE_KEY, String(enabled));
+}
+
 export default function App() {
   const [state, setState] = useState<State>("boot");
 
@@ -77,7 +92,7 @@ export default function App() {
 
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(false);
-  const pageSize = 50;
+  const pageSize = 100;
 
   const [totalAvatars, setTotalAvatars] = useState<number | null>(null);
 
@@ -100,6 +115,13 @@ export default function App() {
 
   // 素体フィルタ（"" = すべて, "__none__" = 未割り当て）
   const [filterBaseId, setFilterBaseId] = useState<string>("");
+
+  const [confirmAvatarChange, setConfirmAvatarChange] = useState<boolean>(() =>
+    loadConfirmAvatarChange()
+  );
+
+  const [sort, setSort] = useState("updated");
+  const [order, setOrder] = useState("descending");
 
   const shownAvatars = mode === "search" ? searchResults : avatars;
   const shownHasMore = mode === "search" ? searchHasMore : hasMore;
@@ -234,9 +256,12 @@ export default function App() {
 
     try {
       const nextOffset = reset ? 0 : offset;
-      const r = await fetch(`${API}/avatars?n=${pageSize}&offset=${nextOffset}`, {
-        credentials: "include",
-      });
+      const r = await fetch(
+        `${API}/avatars?n=${pageSize}&offset=${nextOffset}&sort=${sort}&order=${order}`,
+        {
+          credentials: "include",
+        }
+      );
       const j = await r.json().catch(() => null);
 
       if (!j?.ok) {
@@ -260,6 +285,33 @@ export default function App() {
       }
     } catch {
       setError("アバター取得APIに接続できません");
+    }
+  }
+
+  async function doLogout() {
+    setError("");
+    try {
+      await fetch(`${API}/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch {
+      // APIが落ちててもローカル側はログアウト扱いにする
+    } finally {
+      // ローカル状態を初期化
+      setState("idle");
+      setDisplayName("");
+      setAvatars([]);
+      setOffset(0);
+      setHasMore(false);
+      setTotalAvatars(null);
+
+      setMode("list");
+      setQuery("");
+      setSearchResults([]);
+      setSearchOffset(0);
+      setSearchHasMore(false);
+      setSearchTotal(null);
     }
   }
 
@@ -308,6 +360,10 @@ export default function App() {
 
   /* アバター変更関数 */
   async function selectAvatar(avatarId: string) {
+    if (confirmAvatarChange) {
+      if (!window.confirm("このアバターに変更しますか？")) return;
+    }
+
     setError("");
 
     try {
@@ -420,7 +476,7 @@ export default function App() {
       loadAvatars(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state]);
+  }, [state, sort, order]);
 
   /* 素体情報の永続化 */
   useEffect(() => {
@@ -431,6 +487,11 @@ export default function App() {
   useEffect(() => {
     saveAvatarBaseMap(avatarBaseMap);
   }, [avatarBaseMap]);
+
+  /* 確認設定の永続化 */
+  useEffect(() => {
+    saveConfirmAvatarChange(confirmAvatarChange);
+  }, [confirmAvatarChange]);
 
   useEffect(() => {
     const base = bodyBases.find((b) => b.id === filterBaseId);
@@ -450,7 +511,24 @@ export default function App() {
         }}
       >
         <h1>VRChat Avatar Viewer</h1>
-        <button onClick={() => setShowSettings(true)}>⚙ 設定</button>
+        <div style={{ display: "flex", gap: 8 }}>
+          {state === "logged_in" && (
+            <button
+              onClick={doLogout}
+              style={{
+                background: "#c62828",
+                color: "#fff",
+                border: "none",
+                borderRadius: 4,
+                padding: "6px 10px",
+                cursor: "pointer",
+              }}
+            >
+              ⏻ ログアウト
+            </button>
+          )}
+          <button onClick={() => setShowSettings(true)}>⚙ 設定</button>
+        </div>
       </div>
 
       {error && (
@@ -534,6 +612,25 @@ export default function App() {
             >
               再読み込み
             </button>
+          </div>
+
+          {/* ソートUI */}
+          <div style={{ marginBottom: 12, display: "flex", gap: 12, alignItems: "center" }}>
+            <label>
+              ソート:
+              <select style={{ marginLeft: 4 }} value={sort} onChange={(e) => setSort(e.target.value)}>
+                <option value="updated">更新日時</option>
+                <option value="created">作成日時</option>
+                <option value="name">名前</option>
+              </select>
+            </label>
+            <label>
+              順序:
+              <select style={{ marginLeft: 4 }} value={order} onChange={(e) => setOrder(e.target.value)}>
+                <option value="descending">降順 (新しい/Z-A)</option>
+                <option value="ascending">昇順 (古い/A-Z)</option>
+              </select>
+            </label>
           </div>
 
           {/* 検索UI */}
@@ -774,6 +871,8 @@ export default function App() {
         <SettingsModal
           bodyBases={bodyBases}
           setBodyBases={setBodyBases}
+          confirmAvatarChange={confirmAvatarChange}
+          setConfirmAvatarChange={setConfirmAvatarChange}
           onClose={() => setShowSettings(false)}
         />
       )}
@@ -786,9 +885,17 @@ export default function App() {
   function SettingsModal(props: {
     bodyBases: BodyBase[];
     setBodyBases: React.Dispatch<React.SetStateAction<BodyBase[]>>;
+    confirmAvatarChange: boolean;
+    setConfirmAvatarChange: React.Dispatch<React.SetStateAction<boolean>>;
     onClose: () => void;
   }) {
-    const { bodyBases, setBodyBases, onClose } = props;
+    const {
+      bodyBases,
+      setBodyBases,
+      confirmAvatarChange,
+      setConfirmAvatarChange,
+      onClose,
+    } = props;
 
     const [input, setInput] = useState("");
 
@@ -818,6 +925,19 @@ export default function App() {
           <div style={{ display: "flex", justifyContent: "space-between" }}>
             <h2>素体設定</h2>
             <button onClick={onClose}>✕</button>
+          </div>
+
+          {/* 全般設定 */}
+          <div style={{ marginBottom: 16 }}>
+            <h3 style={{ fontSize: 16, margin: "0 0 8px 0" }}>全般</h3>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={confirmAvatarChange}
+                onChange={(e) => setConfirmAvatarChange(e.target.checked)}
+              />
+              アバター変更時に確認ダイアログを表示する
+            </label>
           </div>
 
           {/* 追加 */}
