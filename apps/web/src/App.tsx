@@ -143,6 +143,8 @@ export default function App() {
   const canPickTotp = useMemo(() => methods.includes("totp"), [methods]);
 
   const [offset, setOffset] = useState(0);
+  const [loadingProgress, setLoadingProgress] = useState("");
+  const [isLoadingAll, setIsLoadingAll] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const pageSize = 100;
 
@@ -353,40 +355,63 @@ export default function App() {
     }
   }
 
-  async function loadAvatars(reset = false) {
+  async function fetchAllAvatars(reset = false) {
+    if (isLoadingAll && !reset) return; // Prevent double trigger
     setError("");
+    setIsLoadingAll(true);
 
     try {
-      const nextOffset = reset ? 0 : offset;
-      const r = await fetch(
-        `${API}/avatars?n=${pageSize}&offset=${nextOffset}&sort=${sort}&order=${order}`,
-        {
-          credentials: "include",
-        }
-      );
-      const j = await r.json().catch(() => null);
-
-      if (!j?.ok) {
-        setError("アバター取得に失敗（未ログイン/セッション切れ）");
-        return;
-      }
-
-      if (typeof j.total === "number") {
-        setTotalAvatars(j.total);
-      }
-
-      const newItems: Avatar[] = j.avatars || [];
-      setHasMore(!!j.hasMore);
-
+      let currentOffset = reset ? 0 : offset;
       if (reset) {
-        setAvatars(newItems);
-        setOffset(newItems.length);
-      } else {
-        setAvatars((prev) => [...prev, ...newItems]);
-        setOffset(nextOffset + newItems.length);
+        setAvatars([]);
+        setOffset(0);
+        setTotalAvatars(null);
       }
-    } catch {
+
+      while (true) {
+        setLoadingProgress(`${currentOffset} 件取得中...`);
+
+        const r = await fetch(
+          `${API}/avatars?n=${pageSize}&offset=${currentOffset}&sort=${sort}&order=${order}`,
+          { credentials: "include" }
+        );
+        const j = await r.json().catch(() => null);
+
+        if (!j?.ok) {
+          setError("アバター取得に失敗（未ログイン/セッション切れ）");
+          break;
+        }
+
+        if (typeof j.total === "number") {
+          setTotalAvatars(j.total);
+        }
+
+        const newItems: Avatar[] = j.avatars || [];
+        const serverHasMore = !!j.hasMore;
+
+        if (reset && currentOffset === 0) {
+          setAvatars(newItems);
+        } else {
+          setAvatars((prev) => [...prev, ...newItems]);
+        }
+
+        currentOffset += newItems.length;
+        setOffset(currentOffset);
+
+        if (!serverHasMore || newItems.length === 0) {
+          break;
+        }
+
+        // Rate limit prevention (simple delay)
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
+    } catch (e) {
+      console.error(e);
       setError("アバター取得APIに接続できません");
+    } finally {
+      setIsLoadingAll(false);
+      setLoadingProgress("");
+      setHasMore(false); // All loaded
     }
   }
 
@@ -566,7 +591,7 @@ export default function App() {
   useEffect(() => {
     if (state === "logged_in") {
       setOffset(0);
-      loadAvatars(true);
+      fetchAllAvatars(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, sort, order]);
@@ -829,8 +854,13 @@ export default function App() {
             {/* 右：一覧 */}
             <main style={{ flex: 1, minWidth: 0 }}>
               {/* Row 0: ログイン情報 */}
-              <div style={{ marginBottom: 16 }}>
+              <div style={{ marginBottom: 16, display: "flex", gap: 12, alignItems: "center" }}>
                 Logged in as <b>{displayName || "(unknown)"}</b>
+                {isLoadingAll && (
+                  <span style={{ fontSize: "0.9rem", color: "#2563eb", fontWeight: "bold" }}>
+                    🔄 {loadingProgress}
+                  </span>
+                )}
               </div>
 
               {/* Row 1: 全N体 + ソート + 順序 */}
@@ -1076,9 +1106,9 @@ export default function App() {
                 ))}
               </div>
 
-              {shownHasMore && (
+              {shownHasMore && mode === "search" && (
                 <div style={{ marginTop: 16 }}>
-                  <button onClick={() => (mode === "search" ? searchAvatars(false) : loadAvatars(false))}>
+                  <button onClick={() => searchAvatars(false)}>
                     もっと読む
                   </button>
                 </div>

@@ -40,12 +40,10 @@ app.get("/health", (c) => c.json({ ok: true }));
 const SID_TTL_SEC = 60 * 60 * 24 * 30; // 30日
 app.use("*", async (c, next) => {
     const incoming = getCookie(c, "sid");
-    console.log("[API] incoming sid =", incoming, "hasSession?", incoming ? hasSession(incoming) : "(no)");
 
     let sid = incoming;
     if (!sid || !hasSession(sid)) {
         sid = createSession();
-        console.log("[API] created new sid =", sid);
 
         setCookie(c, "sid", sid, {
             httpOnly: true,
