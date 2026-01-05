@@ -125,7 +125,16 @@ app.get("/avatars", async (c) => {
     const safeOffset = Number.isFinite(offset) ? Math.max(offset, 0) : 0;
 
     try {
-        const r = await vrcGetMyAvatars(sid, safeN, safeOffset, sort, order);
+        const tasks: Promise<any>[] = [
+            vrcGetMyAvatars(sid, safeN, safeOffset, sort, order)
+        ];
+
+        // 最初のページの時だけ総数をカウントする
+        if (safeOffset === 0) {
+            tasks.push(vrcCountMyAvatars(sid));
+        }
+
+        const [r, countR] = await Promise.all(tasks);
 
         if (!r.ok) {
             return c.json({ ok: false, status: r.status, body: r.body }, 401);
@@ -157,55 +166,14 @@ app.get("/avatars", async (c) => {
 
         // VRChatは配列だけ返すので「次があるか」を推定
         const hasMore = (r.avatars?.length ?? 0) === safeN;
+        const total = countR ? countR.total : undefined;
 
-        return c.json({ ok: true, avatars, offset: safeOffset, n: safeN, hasMore });
+        return c.json({ ok: true, avatars, offset: safeOffset, n: safeN, hasMore, total });
     } catch {
         return c.json({ ok: false, error: "AVATARS_FAILED" }, 500);
     }
 });
 
-let cachedTotal: number | null = null;
-
-// /* トータルを返却するエンドポイント */
-// app.get("/avatars", async (c) => {
-//     const sid = getCookie(c, "sid")!;
-
-//     const n = Number(c.req.query("n") ?? "50");
-//     const offset = Number(c.req.query("offset") ?? "0");
-//     const safeN = Number.isFinite(n) ? Math.min(Math.max(n, 1), 100) : 50;
-//     const safeOffset = Number.isFinite(offset) ? Math.max(offset, 0) : 0;
-
-//     try {
-//         // 初回だけ総数を数える
-//         if (cachedTotal === null) {
-//             const cr = await vrcCountMyAvatars(sid);
-//             if (!cr.ok) return c.json({ ok: false, status: cr.status, body: cr.body }, 401);
-//             cachedTotal = cr.total;
-//         }
-
-//         const r = await vrcGetMyAvatars(sid, safeN, safeOffset);
-//         if (!r.ok) return c.json({ ok: false, status: r.status, body: r.body }, 401);
-
-//         const avatars = (r.avatars ?? []).map((a: any) => ({
-//             id: a.id,
-//             name: a.name,
-//             thumbnail: a.thumbnailImageUrl,
-//             platform: a.platform,
-//             updatedAt: a.updated_at,
-//         }));
-
-//         return c.json({
-//             ok: true,
-//             avatars,
-//             total: cachedTotal,
-//             hasMore: safeOffset + avatars.length < cachedTotal,
-//             offset: safeOffset,
-//             n: safeN,
-//         });
-//     } catch {
-//         return c.json({ ok: false, error: "AVATARS_FAILED" }, 500);
-//     }
-// });
 
 /**アバター検索のエンドポイント */
 app.get("/avatars/search", async (c) => {

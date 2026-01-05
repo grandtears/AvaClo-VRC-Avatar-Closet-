@@ -11,9 +11,11 @@
   will-change: filter;
   transition: filter 300ms;
 }
+
 .logo:hover {
   filter: drop-shadow(0 0 2em #646cffaa);
 }
+
 .logo.react:hover {
   filter: drop-shadow(0 0 2em #61dafbaa);
 }
@@ -22,6 +24,7 @@
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
@@ -39,4 +42,41 @@
 
 .read-the-docs {
   color: #888;
+}
+
+/* アバター一覧のグリッドレイアウト */
+.avatar-grid {
+  display: grid;
+  gap: 12px;
+}
+
+/* メインレイアウト（サイドバー + メインコンテンツ） */
+.main-layout {
+  display: flex;
+  flex-direction: column;
+}
+
+/* モダンなセレクトボックス */
+.modern-select {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  background-color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  color: #333;
+}
+
+.modern-select:focus {
+  border-color: #646cff;
+  box-shadow: 0 0 0 2px rgba(100, 108, 255, 0.2);
+}
+
+/* デスクトップ: 4列 */
+@media (min-width: 1024px) {
+  .avatar-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
