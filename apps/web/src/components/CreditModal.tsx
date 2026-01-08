@@ -32,7 +32,7 @@ export function CreditModal({ isOpen, onClose }: CreditModalProps) {
         <div style={overlayStyle} onClick={onClose}>
             <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
                 <h2 style={{ margin: "0 0 16px", color: "#333", fontSize: "1.5rem" }}>
-                    VRC Avatar Manager
+                    AvaClo(あばくろ)
                 </h2>
 
                 <p style={{ margin: "0 0 8px", fontSize: "1.1rem" }}>

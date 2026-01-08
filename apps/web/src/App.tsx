@@ -566,7 +566,7 @@ export default function App() {
         onClose={() => setShowCredits(false)}
       />
       <header className="app-header">
-        <h1 className="app-title">VRC Avatar Manager</h1>
+        <h1 className="app-title">AvaClo(あばくろ)</h1>
         <div style={{ display: "flex", gap: 8 }}>
           {state === "logged_in" && (
             <button

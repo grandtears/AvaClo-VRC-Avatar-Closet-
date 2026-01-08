@@ -29,7 +29,7 @@ async function getOrInitSecret(dataDir) {
         return null;
     }
 
-    const secretFile = path.join(dataDir, "vrc-avatar-manager-secret.key");
+    const secretFile = path.join(dataDir, "avaclo-secret.key");
 
     if (fs.existsSync(secretFile)) {
         // 既存キーのロード
@@ -81,8 +81,8 @@ async function createWindow() {
             dataDir = app.getPath('userData');
         }
 
-        const sessionFile = path.join(dataDir, "vrc-avatar-manager-sessions.json");
-        const settingsFile = path.join(dataDir, "vrc-avatar-manager-settings.json");
+        const sessionFile = path.join(dataDir, "avaclo-sessions.json");
+        const settingsFile = path.join(dataDir, "avaclo-settings.json");
         const webDir = path.join(__dirname, "web");
 
         // マスターキー準備
@@ -117,7 +117,7 @@ async function createWindow() {
         },
         autoHideMenuBar: true,
         backgroundColor: "#eff6ff",
-        title: "VRC Avatar Manager",
+        title: "AvaClo(あばくろ)",
         icon: path.join(__dirname, 'resources/icon.png')
     });
 
