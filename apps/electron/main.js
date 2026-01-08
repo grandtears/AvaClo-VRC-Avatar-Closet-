@@ -1,4 +1,4 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, shell } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 
@@ -117,7 +117,17 @@ async function createWindow() {
         },
         autoHideMenuBar: true,
         backgroundColor: "#eff6ff",
-        title: "VRC Avatar Manager"
+        title: "VRC Avatar Manager",
+        icon: path.join(__dirname, 'resources/icon.png')
+    });
+
+    // 外部リンクをデフォルトブラウザで開く設定
+    win.webContents.setWindowOpenHandler(({ url }) => {
+        if (url.startsWith('http:') || url.startsWith('https:')) {
+            shell.openExternal(url);
+            return { action: 'deny' };
+        }
+        return { action: 'allow' };
     });
 
     if (app.isPackaged) {

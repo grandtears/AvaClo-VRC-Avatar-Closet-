@@ -47,7 +47,8 @@
       }
     ],
     "win": {
-      "target": "portable"
+      "target": "portable",
+      "icon": "resources/icon.png"
     }
   },
   "dependencies": {

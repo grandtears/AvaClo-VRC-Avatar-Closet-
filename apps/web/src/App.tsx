@@ -576,8 +576,8 @@ export default function App() {
               🚪 ログアウト
             </button>
           )}
-          <button className="btn btn-secondary btn-sm" onClick={() => setShowCredits(true)}>ⓘ クレジット</button>
           <button className="btn btn-secondary btn-sm" onClick={() => setShowSettings(true)}>⚙ 設定</button>
+          <button className="btn btn-secondary btn-sm" onClick={() => setShowCredits(true)}>ⓘ クレジット</button>
         </div>
       </header>
 
