@@ -15,7 +15,7 @@ VRChatのアバターとパラメータを管理・整理するためのWindows�
 ### データの保存場所について
 本アプリはポータブル版として動作するため、設定データやログイン情報は **exeファイルと同じフォルダ** に保存されます。
 
-- `vrc-avatar-manager-sessions.json`: ログインセッション情報
+- `vrc-avatar-manager-sessions.json`: ログインセッション情報（暗号化済み）
 - `vrc-avatar-manager-settings.json`: アバターの設定・マッピング情報
 
 USBメモリなどで持ち運ぶ際は、これらのファイルも一緒に移動させることで環境を維持できます。
@@ -57,6 +57,9 @@ Monorepo構成（Turborepo）を採用し、Frontend、Backend、Electronを管�
 #### Persistence
 - **Storage**: Local JSON files (`fs` module usage)
 - **Strategy**: ポータブル稼働を前提とし、`process.env.PORTABLE_EXECUTABLE_DIR` を優先して保存場所を解決するロジックを実装。
+
+### セキュリティ (Security)
+- **Encryption**: ログインセッション情報 (`vrc-avatar-manager-sessions.json`) は、Windows DPAPI (Data Protection API) 等を使用して暗号化され、安全に保存されます。
 
 ## 開発者向け (Development)
 

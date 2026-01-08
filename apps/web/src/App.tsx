@@ -28,6 +28,7 @@ import { TagCloud } from "./components/TagCloud";
 const API = (window as any).VAM_API_URL || "http://localhost:8787";
 
 import { InputModal } from "./components/InputModal";
+import { CreditModal } from "./components/CreditModal";
 
 export default function App() {
   const [state, setState] = useState<State>("boot");
@@ -63,6 +64,7 @@ export default function App() {
   const [searchResults, setSearchResults] = useState<Avatar[]>([]);
 
   const [showSettings, setShowSettings] = useState(false);
+  const [showCredits, setShowCredits] = useState(false);
   const [inputModal, setInputModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -559,6 +561,10 @@ export default function App() {
           setInputModal((prev) => ({ ...prev, isOpen: false }));
         }}
       />
+      <CreditModal
+        isOpen={showCredits}
+        onClose={() => setShowCredits(false)}
+      />
       <header className="app-header">
         <h1 className="app-title">VRC Avatar Manager</h1>
         <div style={{ display: "flex", gap: 8 }}>
@@ -570,6 +576,7 @@ export default function App() {
               🚪 ログアウト
             </button>
           )}
+          <button className="btn btn-secondary btn-sm" onClick={() => setShowCredits(true)}>ⓘ クレジット</button>
           <button className="btn btn-secondary btn-sm" onClick={() => setShowSettings(true)}>⚙ 設定</button>
         </div>
       </header>
