@@ -13,7 +13,6 @@ import type {
 } from "./types";
 import {
   fetchSettings, // Imported
-  loadBodyBases, // kept for backward compat if needed by other files, but unused in App
   saveBodyBases,
   saveAvatarBaseMap,
   saveFavFolders,
@@ -21,12 +20,14 @@ import {
   saveAvatarTags,
   saveConfirmAvatarChange,
 } from "./storage";
-import { uid, normalizeRank, getPerfRank, rankBadge } from "./utils";
+import { uid, getPerfRank, rankBadge } from "./utils";
 import { SettingsModal } from "./components/SettingsModal";
 import { BaseItem } from "./components/BaseItem";
 import { TagCloud } from "./components/TagCloud";
 
 const API = (window as any).VAM_API_URL || "http://localhost:8787";
+
+import { InputModal } from "./components/InputModal";
 
 export default function App() {
   const [state, setState] = useState<State>("boot");
@@ -62,6 +63,12 @@ export default function App() {
   const [searchResults, setSearchResults] = useState<Avatar[]>([]);
 
   const [showSettings, setShowSettings] = useState(false);
+  const [inputModal, setInputModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    placeholder?: string;
+    onConfirm: (val: string) => void;
+  }>({ isOpen: false, title: "", onConfirm: () => { } });
 
   // Initialize with empty/defaults to avoid blocking render
   const [bodyBases, setBodyBases] = useState<BodyBase[]>([]);
@@ -489,11 +496,10 @@ export default function App() {
     saveAvatarTags(avatarTags);
   }, [avatarTags]);
 
+  /* タグ永続化 */
   useEffect(() => {
-    const base = bodyBases.find((b) => b.id === filterBaseId);
-
-    const hits = avatars.filter((a) => avatarBaseMap[a.id] === filterBaseId).length;
-  }, [filterBaseId, bodyBases, avatars, avatarBaseMap]);
+    saveAvatarTags(avatarTags);
+  }, [avatarTags]);
 
   /* バックアップ機能 */
   function exportBackup() {
@@ -543,6 +549,16 @@ export default function App() {
 
   return (
     <div>
+      <InputModal
+        isOpen={inputModal.isOpen}
+        title={inputModal.title}
+        placeholder={inputModal.placeholder}
+        onClose={() => setInputModal((prev) => ({ ...prev, isOpen: false }))}
+        onConfirm={(val) => {
+          inputModal.onConfirm(val);
+          setInputModal((prev) => ({ ...prev, isOpen: false }));
+        }}
+      />
       <header className="app-header">
         <h1 className="app-title">VRC Avatar Manager</h1>
         <div style={{ display: "flex", gap: 8 }}>
@@ -669,11 +685,15 @@ export default function App() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      const name = prompt("素体名を入力（例：マヌカ）")?.trim();
-                      if (name) {
-                        setBodyBases((prev) => [...prev, { id: uid(), name }]);
-                        setIsBodyExpanded(true);
-                      }
+                      setInputModal({
+                        isOpen: true,
+                        title: "素体カテゴリ作成",
+                        placeholder: "カテゴリ名（例：マヌカ）",
+                        onConfirm: (val) => {
+                          setBodyBases((prev) => [...prev, { id: uid(), name: val }]);
+                          setIsBodyExpanded(true);
+                        }
+                      });
                     }}
                     className="btn btn-secondary btn-sm"
                     style={{ padding: "0px 6px", height: "auto" }}
@@ -720,11 +740,15 @@ export default function App() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      const name = prompt("新しいフォルダ名")?.trim();
-                      if (name) {
-                        setFavFolders((prev) => [...prev, { id: uid(), name }]);
-                        setIsFavExpanded(true);
-                      }
+                      setInputModal({
+                        isOpen: true,
+                        title: "お気に入りフォルダ作成",
+                        placeholder: "フォルダ名",
+                        onConfirm: (val) => {
+                          setFavFolders((prev) => [...prev, { id: uid(), name: val }]);
+                          setIsFavExpanded(true);
+                        }
+                      });
                     }}
                     className="btn btn-secondary btn-sm"
                     style={{ padding: "0px 6px", height: "auto" }}
