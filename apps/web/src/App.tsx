@@ -915,6 +915,16 @@ export default function App() {
                 </label>
               </div>
               <div className="avatar-grid">
+                {isLoadingAll && avatars.length === 0 && Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className="avatar-card" style={{ opacity: 0.7 }}>
+                    <div className="avatar-thumb-container" style={{ background: "#eee", animation: "pulse 1.5s infinite" }}></div>
+                    <div className="card-content" style={{ gap: 8 }}>
+                      <div style={{ height: 24, background: "#eee", borderRadius: 4, width: "80%", animation: "pulse 1.5s infinite" }} />
+                      <div style={{ height: 16, background: "#eee", borderRadius: 4, width: "50%", animation: "pulse 1.5s infinite" }} />
+                      <div style={{ height: 16, background: "#eee", borderRadius: 4, width: "40%", animation: "pulse 1.5s infinite" }} />
+                    </div>
+                  </div>
+                ))}
                 {filteredAvatars.map((a) => (
                   <div key={a.id} className="avatar-card">
                     <div className="avatar-thumb-container">
