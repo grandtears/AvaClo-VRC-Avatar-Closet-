@@ -27,7 +27,7 @@ AvaClo (あばくろ) - VRChat Avatar Manager v1.0.0
 
 ■ ソースコードについて
 本ツールはセキュリティの透明性を確保するため、ソースコードを公開しています。
-GitHub: [GitHubリポジトリのURL]
+GitHub: https://github.com/grandtears/AvaClo-VRC-Avatar-Closet-?tab=MIT-1-ov-file
 
 ■ ライセンス
 本ソフトウェアは MIT License の下で提供されています。
