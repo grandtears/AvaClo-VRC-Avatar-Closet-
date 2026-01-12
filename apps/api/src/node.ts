@@ -186,11 +186,17 @@ app.get("/avatars", async (c) => {
             const platforms: string[] = [];
             const performanceMap: Record<string, string> = {};
 
-            for (const p of (a.unityPackages ?? [])) {
-                if (p.platform) {
-                    platforms.push(p.platform);
-                    if (p.performanceRating) {
-                        performanceMap[p.platform] = p.performanceRating;
+            // Use the top-level performance object for both platforms and ratings
+            // Example: { standalonewindows: 'VeryPoor', android: 'Good' }
+            if (a.performance && typeof a.performance === "object") {
+                for (const [platform, value] of Object.entries(a.performance)) {
+                    // Ignore sorting keys like 'standalonewindows-sort'
+                    if (platform.endsWith("-sort")) continue;
+
+                    if (typeof value === "string") {
+                        performanceMap[platform] = value;
+                        // If a platform key exists in performance, it means the avatar supports it
+                        platforms.push(platform);
                     }
                 }
             }
@@ -202,7 +208,7 @@ app.get("/avatars", async (c) => {
                 createdAt: a.created_at,
                 updatedAt: a.updated_at,
                 platforms: Array.from(new Set(platforms)),
-                performance: Object.keys(performanceMap).length > 0 ? performanceMap : (a.performance ?? null),
+                performance: performanceMap,
             };
         });
 
@@ -269,9 +275,18 @@ app.get("/avatars/search", async (c) => {
         }
 
         const avatars = window.map((a: any) => {
-            const platforms = Array.from(
-                new Set((a.unityPackages ?? []).map((p: any) => String(p.platform)).filter(Boolean))
-            );
+            const platforms: string[] = [];
+            const performanceMap: Record<string, string> = {};
+
+            if (a.performance && typeof a.performance === "object") {
+                for (const [platform, value] of Object.entries(a.performance)) {
+                    if (platform.endsWith("-sort")) continue;
+                    if (typeof value === "string") {
+                        performanceMap[platform] = value as string;
+                        platforms.push(platform);
+                    }
+                }
+            }
 
             return {
                 id: a.id,
@@ -280,7 +295,7 @@ app.get("/avatars/search", async (c) => {
                 createdAt: a.created_at,
                 updatedAt: a.updated_at,
                 platforms,
-                performance: a.performance ?? null,
+                performance: performanceMap,
             };
         });
 
