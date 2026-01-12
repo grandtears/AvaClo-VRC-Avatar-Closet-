@@ -83,6 +83,7 @@ export default function App() {
   const [favFolders, setFavFolders] = useState<FavFolder[]>([]);
   const [avatarFavMap, setAvatarFavMap] = useState<AvatarFavMap>({});
   const [filterFavId, setFilterFavId] = useState<string>("");
+  const [filterPerformance, setFilterPerformance] = useState<string>("");
 
   const [avatarTags, setAvatarTags] = useState<AvatarTagMap>({});
   const [filterTag, setFilterTag] = useState<string>("");
@@ -139,6 +140,15 @@ export default function App() {
       list = list.filter((a) => (avatarTags[a.id] || []).includes(filterTag));
     }
 
+    // ⑤ パフォーマンスフィルタ
+    if (filterPerformance) {
+      list = list.filter((a) => {
+        const targetPlatform = onlyMobile ? "android" : "standalonewindows";
+        const rank = getPerfRank(a.performance, targetPlatform);
+        return rank === filterPerformance;
+      });
+    }
+
     // ⑤ 検索（アバター名 or 素体名 or お気に入り名）
     const q = query.trim();
     if (!q) return list;
@@ -185,6 +195,7 @@ export default function App() {
     avatarFavMap,
     avatarTags,
     filterTag,
+    filterPerformance,
   ]);
   const baseCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -902,6 +913,22 @@ export default function App() {
                         {b.name}
                       </option>
                     ))}
+                  </select>
+                </div>
+
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <label style={{ fontSize: "0.95rem" }}>パフォーマンス:</label>
+                  <select
+                    className="modern-select"
+                    value={filterPerformance}
+                    onChange={(e) => setFilterPerformance(e.target.value)}
+                  >
+                    <option value="">すべて</option>
+                    <option value="Excellent">Excellent</option>
+                    <option value="Good">Good</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Poor">Poor</option>
+                    <option value="VeryPoor">VeryPoor</option>
                   </select>
                 </div>
 
