@@ -72,3 +72,7 @@ npm install
 npm run build
 ```
 ビルド成果物は `apps/electron/release/` に出力されます。
+
+## ライセンス (License)
+
+本ソフトウェアは [MIT License](LICENSE) の下で公開されています。
