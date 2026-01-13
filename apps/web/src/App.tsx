@@ -250,7 +250,13 @@ export default function App() {
       const j = await r.json().catch(() => null);
 
       if (!j?.ok) {
-        setError("ログインに失敗（ID/Pass/サーバ未起動）");
+        // j.body.error.message (VRChat standard), j.body.error (VRChat simple), j.error (Backend 500/Custom)
+        const msg = j?.body?.error?.message
+          || (typeof j?.body?.error === "string" ? j?.body?.error : "")
+          || j?.error
+          || JSON.stringify(j?.body?.error)
+          || "ログインに失敗しました";
+        setError(`ログイン失敗: ${msg}`);
         return;
       }
 
@@ -284,7 +290,16 @@ export default function App() {
       const j = await r.json().catch(() => null);
 
       if (!j?.ok) {
-        const backendMsg = j?.body?.error?.message || JSON.stringify(j?.body) || "Unknown error";
+        let backendMsg = "Unknown error";
+        if (j?.body?.error?.message) {
+          backendMsg = j.body.error.message;
+        } else if (j?.body?.error) {
+          backendMsg = typeof j.body.error === 'string' ? j.body.error : JSON.stringify(j.body.error);
+        } else if (j?.error) {
+          backendMsg = j.error;
+        } else if (j?.body) {
+          backendMsg = JSON.stringify(j.body);
+        }
         setError(`2FA失敗: ${backendMsg}`);
         return;
       }
@@ -592,7 +607,7 @@ export default function App() {
         </div>
       </header>
 
-      {error && (
+      {error && state !== "idle" && state !== "2fa_required" && (
         <div
           style={{
             padding: 12,
@@ -612,6 +627,21 @@ export default function App() {
           <div className="login-card">
             <h1 style={{ margin: "0 0 10px", color: "#555", fontSize: "1.2rem" }}>VRC Avatar Manager</h1>
             <div className="login-title">ログイン</div>
+
+            {error && (
+              <div style={{
+                color: "#d32f2f",
+                backgroundColor: "#ffebee",
+                padding: "8px",
+                borderRadius: "4px",
+                marginBottom: "8px",
+                fontSize: "0.9rem",
+                textAlign: "left"
+              }}>
+                {error}
+              </div>
+            )}
+
             <input
               className="login-input"
               placeholder="VRChat Username"
@@ -646,6 +676,20 @@ export default function App() {
             <div style={{ color: "#555", marginBottom: 16 }}>
               認証コードを入力してください。
             </div>
+
+            {error && (
+              <div style={{
+                color: "#d32f2f",
+                backgroundColor: "#ffebee",
+                padding: "8px",
+                borderRadius: "4px",
+                marginBottom: "8px",
+                fontSize: "0.9rem",
+                textAlign: "left"
+              }}>
+                {error}
+              </div>
+            )}
 
             <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
               <span style={{ fontWeight: 600, color: "#666" }}>方式:</span>
