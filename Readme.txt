@@ -18,9 +18,8 @@ AvaClo (あばくろ) - VRChat Avatar Manager v1.0.0
 
 ■ データについて
 設定やログイン情報は、exeファイルと同じフォルダに以下のファイルとして保存されます。
-- vrc-avatar-manager-settings.json (設定・タグ・カテゴリ等)
+- settings.json (設定・タグ・カテゴリ等)
 - sessions.json (ログインセッション)
-- app.log (動作ログ)
 
 フォルダごと移動すれば、設定もそのまま引き継がれます。
 (削除したい場合はフォルダごと削除してください)
