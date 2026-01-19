@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell } = require('electron');
+const { app, BrowserWindow, shell, Menu } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 
@@ -128,6 +128,22 @@ async function createWindow() {
             return { action: 'deny' };
         }
         return { action: 'allow' };
+    });
+
+    // 右クリックメニュー（コピペなど）の実装
+    win.webContents.on('context-menu', (event, params) => {
+        const menu = Menu.buildFromTemplate([
+            { role: 'cut', label: '切り取り' },
+            { role: 'copy', label: 'コピー' },
+            { role: 'paste', label: '貼り付け' },
+            { type: 'separator' },
+            { role: 'selectAll', label: 'すべて選択' },
+        ]);
+
+        // テキスト選択中または入力可能な場所でのみ表示
+        if (params.isEditable || params.selectionText.length > 0) {
+            menu.popup();
+        }
     });
 
     if (app.isPackaged) {
