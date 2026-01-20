@@ -1,8 +1,36 @@
-const { app, BrowserWindow, shell, Menu } = require('electron');
+const { app, BrowserWindow, shell, Menu, ipcMain } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 
 let apiProcess = null;
+
+ipcMain.handle('get-special-thanks', async () => {
+    const fs = require('fs');
+    try {
+        let dataDir = process.env.PORTABLE_EXECUTABLE_DIR;
+        if (!dataDir) {
+            dataDir = app.getPath('userData');
+        }
+
+        const possiblePaths = [];
+        if (process.env.PORTABLE_EXECUTABLE_DIR) {
+            possiblePaths.push(path.join(process.env.PORTABLE_EXECUTABLE_DIR, 'special_thanks.json'));
+        }
+        possiblePaths.push(path.join(process.resourcesPath, 'special_thanks.json'));
+        possiblePaths.push(path.join(__dirname, 'release', 'special_thanks.json')); // Dev mode fallback
+
+        for (const p of possiblePaths) {
+            if (fs.existsSync(p)) {
+                const raw = fs.readFileSync(p, 'utf-8');
+                return JSON.parse(raw);
+            }
+        }
+        return [];
+    } catch (e) {
+        console.error("Failed to load special_thanks.json", e);
+        return [];
+    }
+});
 
 async function findPort() {
     try {
