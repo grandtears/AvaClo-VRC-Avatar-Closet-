@@ -88,6 +88,12 @@ export default function App() {
   const [avatarTags, setAvatarTags] = useState<AvatarTagMap>({});
   const [filterTag, setFilterTag] = useState<string>("");
 
+  /* 日付フィルタ */
+  const [filterDateType, setFilterDateType] = useState<"updated" | "created">("updated");
+  const [filterDateStart, setFilterDateStart] = useState("");
+  const [filterDateEnd, setFilterDateEnd] = useState("");
+  const [isDateExpanded, setIsDateExpanded] = useState(false);
+
   // Load settings on mount
   useEffect(() => {
     fetchSettings().then((s) => {
@@ -149,7 +155,30 @@ export default function App() {
       });
     }
 
-    // ⑤ 検索（アバター名 or 素体名 or お気に入り名）
+    // ⑥ 日付フィルタ
+    if (filterDateStart || filterDateEnd) {
+      list = list.filter((a) => {
+        const targetDateStr = filterDateType === "updated" ? a.updatedAt : a.createdAt;
+        if (!targetDateStr) return false;
+
+        const targetDate = new Date(targetDateStr).getTime();
+        const start = filterDateStart ? new Date(filterDateStart).getTime() : -Infinity;
+        // End date needs to be end of the day or handled carefully. 
+        // Input type="date" returns "YYYY-MM-DD". 
+        // If we want inclusive, we should probably set end time to 23:59:59 or use next day 00:00
+        const endStr = filterDateEnd;
+        let end = Infinity;
+        if (endStr) {
+          const e = new Date(endStr);
+          e.setHours(23, 59, 59, 999);
+          end = e.getTime();
+        }
+
+        return targetDate >= start && targetDate <= end;
+      });
+    }
+
+    // ⑦ 検索（アバター名 or 素体名 or お気に入り名）
     const q = query.trim();
     if (!q) return list;
 
@@ -196,6 +225,9 @@ export default function App() {
     avatarTags,
     filterTag,
     filterPerformance,
+    filterDateType,
+    filterDateStart,
+    filterDateEnd,
   ]);
   const baseCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -860,6 +892,71 @@ export default function App() {
                   </div>
                 )}
 
+              </div>
+
+              {/* 期間フィルタ */}
+              <div className="sidebar-section">
+                <div
+                  className="sidebar-title"
+                  onClick={() => setIsDateExpanded(!isDateExpanded)}
+                >
+                  <span>
+                    期間フィルタ <span style={{ fontSize: 12 }}>{isDateExpanded ? "▼" : "▶"}</span>
+                  </span>
+                </div>
+                {isDateExpanded && (
+                  <div style={{ padding: "4px 0" }}>
+                    <div style={{ display: "flex", gap: 8, marginBottom: 8, fontSize: "0.85rem" }}>
+                      <label>
+                        <input
+                          type="radio"
+                          name="dateType"
+                          checked={filterDateType === "updated"}
+                          onChange={() => setFilterDateType("updated")}
+                        /> 更新
+                      </label>
+                      <label>
+                        <input
+                          type="radio"
+                          name="dateType"
+                          checked={filterDateType === "created"}
+                          onChange={() => setFilterDateType("created")}
+                        /> 作成
+                      </label>
+                    </div>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      <input
+                        type="date"
+                        className="modern-select"
+                        style={{ padding: "4px", fontSize: "0.85rem" }}
+                        value={filterDateStart}
+                        onChange={(e) => setFilterDateStart(e.target.value)}
+                      />
+                      <span style={{ textAlign: "center", fontSize: "0.8rem", color: "#888" }}>～</span>
+                      <input
+                        type="date"
+                        className="modern-select"
+                        style={{ padding: "4px", fontSize: "0.85rem" }}
+                        value={filterDateEnd}
+                        onChange={(e) => setFilterDateEnd(e.target.value)}
+                      />
+                    </div>
+
+                    <div style={{ marginTop: 8, textAlign: "right" }}>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => {
+                          setFilterDateStart("");
+                          setFilterDateEnd("");
+                        }}
+                        disabled={!filterDateStart && !filterDateEnd}
+                      >
+                        クリア
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* タグクラウド */}
