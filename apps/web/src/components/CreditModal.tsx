@@ -25,21 +25,11 @@ interface CreditModalProps {
     onClose: () => void;
 }
 
-export function CreditModal({ isOpen, onClose }: CreditModalProps) {
-    const [specialThanks, setSpecialThanks] = React.useState<string[]>([]);
+import specialThanksData from "../special_thanks.json";
 
-    React.useEffect(() => {
-        if (isOpen) {
-            const electron = (window as any).electron;
-            if (electron && electron.getSpecialThanks) {
-                electron.getSpecialThanks().then((list: string[]) => {
-                    if (Array.isArray(list)) {
-                        setSpecialThanks(list);
-                    }
-                }).catch((err: any) => console.error(err));
-            }
-        }
-    }, [isOpen]);
+export function CreditModal({ isOpen, onClose }: CreditModalProps) {
+    // const [specialThanks, setSpecialThanks] = React.useState<string[]>([]);
+    const specialThanks = specialThanksData;
 
     if (!isOpen) return null;
 
@@ -89,16 +79,17 @@ export function CreditModal({ isOpen, onClose }: CreditModalProps) {
                             Special Thanks
                         </p>
                         <div style={{
-                            maxHeight: "100px",
-                            overflowY: "auto",
                             fontSize: "0.9rem",
                             color: "#555",
                             display: "flex",
-                            flexDirection: "column",
-                            gap: "4px"
+                            flexWrap: "wrap",
+                            gap: "8px",
+                            justifyContent: "center"
                         }}>
                             {specialThanks.map((name, i) => (
-                                <div key={i}>{name}</div>
+                                <span key={i} style={{ background: "#f5f5f5", padding: "2px 8px", borderRadius: "4px" }}>
+                                    {name}
+                                </span>
                             ))}
                         </div>
                     </div>

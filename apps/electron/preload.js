@@ -6,6 +6,4 @@ const apiUrl = `http://localhost:${port}`;
 
 contextBridge.exposeInMainWorld('VAM_API_URL', apiUrl);
 
-contextBridge.exposeInMainWorld('electron', {
-    getSpecialThanks: () => ipcRenderer.invoke('get-special-thanks'),
-});
+
