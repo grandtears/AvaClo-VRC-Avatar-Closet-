@@ -41,7 +41,7 @@ export function CreditModal({ isOpen, onClose }: CreditModalProps) {
                 </h2>
 
                 <p style={{ margin: "0 0 8px", fontSize: "1.1rem" }}>
-                    Version 0.0.2α
+                    Version 1.2.0
                 </p>
 
                 <div style={{ margin: "24px 0", borderTop: "1px solid #eee", borderBottom: "1px solid #eee", padding: "16px 0" }}>
