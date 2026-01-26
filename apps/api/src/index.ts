@@ -35,6 +35,7 @@ app.use("*", async (c, next) => {
             httpOnly: true,
             sameSite: "Lax",
             path: "/",
+            maxAge: 60 * 60 * 24 * 365, // 1年
         });
     }
     await next();

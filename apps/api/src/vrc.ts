@@ -15,10 +15,10 @@ const sessions = new Map<string, Session>();
 const VRC_BASE = "https://api.vrchat.cloud/api/1";
 
 // 環境変数でパス指定があればそちらを優先（Electron/Portable用）
-// Dev mode fallback: assume running from package root
+// Dev mode: use avaclo-sessions.json in release folder for consistency
 const SESSION_FILE = process.env.VAM_SESSION_FILE
     ? path.resolve(process.env.VAM_SESSION_FILE)
-    : path.resolve(process.cwd(), "sessions.json");
+    : path.resolve(process.cwd(), "..", "electron", "release", "avaclo-sessions.json");
 
 const USER_AGENT = "VRChatAvatarManager/0.1";
 
@@ -56,10 +56,23 @@ function loadSessions() {
         }
 
         const data = JSON.parse(jsonStr) as Record<string, any>;
+        let cleaned = 0;
 
         for (const [sid, jarJSON] of Object.entries(data)) {
+            // 空のセッション（cookies: []）をスキップしてクリーンアップ
+            const cookies = jarJSON?.cookies ?? [];
+            if (cookies.length === 0) {
+                cleaned++;
+                continue;
+            }
             const jar = CookieJar.fromJSON(jarJSON);
             sessions.set(sid, { jar });
+        }
+
+        if (cleaned > 0) {
+            logToFile(`[vrc] Cleaned up ${cleaned} empty sessions`);
+            // クリーンアップしたセッションを保存
+            saveSessions();
         }
     } catch (e) {
         logToFile(`[vrc] Error loading sessions: ${e}`);
