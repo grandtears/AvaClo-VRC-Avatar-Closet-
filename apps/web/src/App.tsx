@@ -556,11 +556,6 @@ export default function App() {
     saveAvatarTags(avatarTags);
   }, [avatarTags]);
 
-  /* タグ永続化 */
-  useEffect(() => {
-    saveAvatarTags(avatarTags);
-  }, [avatarTags]);
-
   /* バックアップ機能 */
   function exportBackup() {
     const data = {

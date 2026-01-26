@@ -30,18 +30,75 @@ import fs from "node:fs";
 import path from "node:path";
 const SETTINGS_FILE = process.env.VAM_SETTINGS_FILE
     ? path.resolve(process.env.VAM_SETTINGS_FILE)
-    : path.resolve(process.cwd(), "settings.json");
+    : path.resolve(process.cwd(), "..", "electron", "release", "avaclo-settings.json");
+
+const SETTINGS_BACKUP = SETTINGS_FILE + ".bak";
+const SETTINGS_TEMP = SETTINGS_FILE + ".tmp";
 
 function loadSettings() {
-    if (!fs.existsSync(SETTINGS_FILE)) return {};
-    try {
-        return JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf8"));
-    } catch {
-        return {};
+    // メインファイルを試す
+    if (fs.existsSync(SETTINGS_FILE)) {
+        try {
+            const content = fs.readFileSync(SETTINGS_FILE, "utf8");
+            const data = JSON.parse(content);
+            // 有効なデータかチェック
+            if (data && typeof data === "object") {
+                return data;
+            }
+        } catch (e) {
+            console.error("Failed to load settings from main file:", e);
+        }
     }
+
+    // メインファイルが壊れている/存在しない場合、バックアップを試す
+    if (fs.existsSync(SETTINGS_BACKUP)) {
+        try {
+            const content = fs.readFileSync(SETTINGS_BACKUP, "utf8");
+            const data = JSON.parse(content);
+            if (data && typeof data === "object") {
+                console.log("Restored settings from backup file");
+                // バックアップからメインを復元
+                fs.writeFileSync(SETTINGS_FILE, content);
+                return data;
+            }
+        } catch (e) {
+            console.error("Failed to load settings from backup:", e);
+        }
+    }
+
+    return {};
 }
+
 function saveSettings(data: any) {
-    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(data, null, 2));
+    try {
+        const content = JSON.stringify(data, null, 2);
+
+        // 1. 既存ファイルがあればバックアップを作成
+        if (fs.existsSync(SETTINGS_FILE)) {
+            try {
+                fs.copyFileSync(SETTINGS_FILE, SETTINGS_BACKUP);
+            } catch (e) {
+                console.error("Failed to create backup:", e);
+                // バックアップ失敗でも続行
+            }
+        }
+
+        // 2. 一時ファイルに書き込み（アトミック書き込み準備）
+        fs.writeFileSync(SETTINGS_TEMP, content);
+
+        // 3. 一時ファイルをメインファイルにリネーム（アトミック）
+        fs.renameSync(SETTINGS_TEMP, SETTINGS_FILE);
+
+    } catch (e) {
+        console.error("Failed to save settings:", e);
+        // 一時ファイルが残っていたら削除
+        try {
+            if (fs.existsSync(SETTINGS_TEMP)) {
+                fs.unlinkSync(SETTINGS_TEMP);
+            }
+        } catch { }
+        throw e; // エラーを再スロー
+    }
 }
 
 // Settings Endpoints
@@ -49,9 +106,13 @@ app.get("/settings", (c) => {
     return c.json(loadSettings());
 });
 app.post("/settings", async (c) => {
-    const data = await c.req.json();
-    saveSettings(data);
-    return c.json({ ok: true });
+    try {
+        const data = await c.req.json();
+        saveSettings(data);
+        return c.json({ ok: true });
+    } catch (e) {
+        return c.json({ ok: false, error: "Failed to save settings" }, 500);
+    }
 });
 
 // Windows GUI app (Electron) blocks if console.log writes to non-existent stdout.
