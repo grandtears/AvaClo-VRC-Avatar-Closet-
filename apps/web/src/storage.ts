@@ -90,6 +90,19 @@ function pushSettingsDebounced() {
 
     // デバウンス: 最後の変更から DEBOUNCE_MS 後に保存
     saveTimer = setTimeout(async () => {
+        // 空データチェック: 全てが空の場合は保存しない（データ消失防止）
+        const isEmpty =
+            cache.bodyBases.length === 0 &&
+            Object.keys(cache.avatarBaseMap).length === 0 &&
+            cache.favFolders.length === 0 &&
+            Object.keys(cache.avatarFavMap).length === 0 &&
+            Object.keys(cache.avatarTags).length === 0;
+
+        if (isEmpty) {
+            console.log("All settings are empty, skipping save to prevent data loss");
+            return;
+        }
+
         const success = await saveWithRetry({ ...cache });
         if (!success) {
             console.error("Failed to save settings after all retries");
