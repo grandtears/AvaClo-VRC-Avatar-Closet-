@@ -806,12 +806,54 @@ export default function App() {
                     <div style={{ height: 1, background: "#e2e8f0", margin: "6px 0" }} />
 
                     {bodyBases.map((b) => (
-                      <BaseItem
-                        key={b.id}
-                        active={filterBaseId === b.id}
-                        label={`${b.name} (${baseCounts.byId[b.id] ?? 0})`}
-                        onClick={() => setFilterBaseId(b.id)}
-                      />
+                      <div key={b.id} style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                        <div style={{ flex: 1 }}>
+                          <BaseItem
+                            active={filterBaseId === b.id}
+                            label={`${b.name} (${baseCounts.byId[b.id] ?? 0})`}
+                            onClick={() => setFilterBaseId(b.id)}
+                          />
+                        </div>
+                        <button
+                          className="tag-delete-btn"
+                          title="名前変更"
+                          onClick={() => {
+                            setInputModal({
+                              isOpen: true,
+                              title: "素体カテゴリ名を変更",
+                              placeholder: b.name,
+                              onConfirm: (val) => {
+                                if (!val.trim()) return;
+                                setBodyBases((prev) =>
+                                  prev.map((x) => (x.id === b.id ? { ...x, name: val } : x))
+                                );
+                              },
+                            });
+                          }}
+                          style={{ fontSize: 12, width: 20, height: 20 }}
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          className="tag-delete-btn"
+                          title="削除"
+                          onClick={() => {
+                            if (!confirm(`素体カテゴリ「${b.name}」を削除しますか？`)) return;
+                            setBodyBases((prev) => prev.filter((x) => x.id !== b.id));
+                            setAvatarBaseMap((prev) => {
+                              const next = { ...prev };
+                              for (const k of Object.keys(next)) {
+                                if (next[k] === b.id) delete next[k];
+                              }
+                              return next;
+                            });
+                            if (filterBaseId === b.id) setFilterBaseId("");
+                          }}
+                          style={{ fontSize: 16, width: 20, height: 20 }}
+                        >
+                          ×
+                        </button>
+                      </div>
                     ))}
                   </div>
                 )}
@@ -866,6 +908,27 @@ export default function App() {
                         </div>
                         <button
                           className="tag-delete-btn"
+                          title="名前変更"
+                          onClick={() => {
+                            setInputModal({
+                              isOpen: true,
+                              title: "お気に入りフォルダ名を変更",
+                              placeholder: f.name,
+                              onConfirm: (val) => {
+                                if (!val.trim()) return;
+                                setFavFolders((prev) =>
+                                  prev.map((x) => (x.id === f.id ? { ...x, name: val } : x))
+                                );
+                              },
+                            });
+                          }}
+                          style={{ fontSize: 12, width: 20, height: 20 }}
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          className="tag-delete-btn"
+                          title="削除"
                           onClick={() => {
                             if (!confirm(`フォルダ「${f.name}」を削除しますか？`)) return;
                             setFavFolders((prev) => prev.filter((x) => x.id !== f.id));
