@@ -29,6 +29,7 @@ const API = (window as any).VAM_API_URL || "http://localhost:8787";
 
 import { InputModal } from "./components/InputModal";
 import { CreditModal } from "./components/CreditModal";
+import { ConfirmModal } from "./components/ConfirmModal";
 
 export default function App() {
   const [state, setState] = useState<State>("boot");
@@ -71,6 +72,13 @@ export default function App() {
     placeholder?: string;
     onConfirm: (val: string) => void;
   }>({ isOpen: false, title: "", onConfirm: () => { } });
+
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({ isOpen: false, title: "", message: "", onConfirm: () => { } });
 
   // Initialize with empty/defaults to avoid blocking render
   const [bodyBases, setBodyBases] = useState<BodyBase[]>([]);
@@ -618,6 +626,16 @@ export default function App() {
         isOpen={showCredits}
         onClose={() => setShowCredits(false)}
       />
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        onConfirm={() => {
+          confirmModal.onConfirm();
+          setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        }}
+        onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+      />
       <header className="app-header">
         <h1 className="app-title">AvaClo(あばくろ)</h1>
         <div style={{ display: "flex", gap: 8 }}>
@@ -838,16 +856,22 @@ export default function App() {
                           className="tag-delete-btn"
                           title="削除"
                           onClick={() => {
-                            if (!confirm(`素体カテゴリ「${b.name}」を削除しますか？`)) return;
-                            setBodyBases((prev) => prev.filter((x) => x.id !== b.id));
-                            setAvatarBaseMap((prev) => {
-                              const next = { ...prev };
-                              for (const k of Object.keys(next)) {
-                                if (next[k] === b.id) delete next[k];
-                              }
-                              return next;
+                            setConfirmModal({
+                              isOpen: true,
+                              title: "素体カテゴリの削除",
+                              message: `素体カテゴリ「${b.name}」を削除しますか？`,
+                              onConfirm: () => {
+                                setBodyBases((prev) => prev.filter((x) => x.id !== b.id));
+                                setAvatarBaseMap((prev) => {
+                                  const next = { ...prev };
+                                  for (const k of Object.keys(next)) {
+                                    if (next[k] === b.id) delete next[k];
+                                  }
+                                  return next;
+                                });
+                                if (filterBaseId === b.id) setFilterBaseId("");
+                              },
                             });
-                            if (filterBaseId === b.id) setFilterBaseId("");
                           }}
                           style={{ fontSize: 16, width: 20, height: 20 }}
                         >
@@ -930,16 +954,22 @@ export default function App() {
                           className="tag-delete-btn"
                           title="削除"
                           onClick={() => {
-                            if (!confirm(`フォルダ「${f.name}」を削除しますか？`)) return;
-                            setFavFolders((prev) => prev.filter((x) => x.id !== f.id));
-                            setAvatarFavMap((prev) => {
-                              const next = { ...prev };
-                              for (const k of Object.keys(next)) {
-                                if (next[k] === f.id) delete next[k];
-                              }
-                              return next;
+                            setConfirmModal({
+                              isOpen: true,
+                              title: "お気に入りフォルダの削除",
+                              message: `フォルダ「${f.name}」を削除しますか？`,
+                              onConfirm: () => {
+                                setFavFolders((prev) => prev.filter((x) => x.id !== f.id));
+                                setAvatarFavMap((prev) => {
+                                  const next = { ...prev };
+                                  for (const k of Object.keys(next)) {
+                                    if (next[k] === f.id) delete next[k];
+                                  }
+                                  return next;
+                                });
+                                if (filterFavId === f.id) setFilterFavId("");
+                              },
                             });
-                            if (filterFavId === f.id) setFilterFavId("");
                           }}
                           style={{ fontSize: 16, width: 20, height: 20 }}
                         >
